@@ -1,0 +1,19 @@
+name: sandwich
+morpheme: ku
+children:
+- name: base
+  morpheme: po
+  children:
+  - name: bagel
+    morpheme: lo
+  - name: wheat bread
+    morpheme: ma
+- name: cheese
+  morpheme: wa
+  children:
+  - name: cheddar
+    morpheme: ku
+  - name: swiss cheese
+    morpheme: na
+  - name: mozzerella
+    morpheme: me

@@ -1,0 +1,17 @@
+[package]
+name = "sammich-2"
+version = "0.1.0"
+authors = ["Taylor Snead <taylorsnead@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "*"
+futures = "0.3"
+itertools = "*"
+nom = "*"
+serde_yaml = "*"
+serde = { version = "1.0", features = ["derive"] }
+derive_deref = "*"
+rand = "*"

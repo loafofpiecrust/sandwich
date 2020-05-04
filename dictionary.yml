@@ -1,0 +1,27 @@
+loha: # Hello, goodbye
+  function: Greeting
+  role: Special
+noha: # yes
+  function: Affirmation
+  role: Special
+meha: # me, I
+  function: Pronoun
+  role: Noun
+nu: # to want
+  role: Verb
+  function: Desire
+kupolo: # bagel
+  function: Ingredient
+  role: Noun
+kupoma:
+  function: Ingredient
+  role: Noun
+kuwaku: # cheddar cheese
+  function: Ingredient
+  role: Noun
+kuwana: # swiss
+  function: Ingredient
+  role: Noun
+kuwame: # mozz
+  function: Ingredient
+  role: Noun
