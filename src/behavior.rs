@@ -24,6 +24,7 @@ impl Behavior for Forgetful {
         pick: &'a Ingredient,
     ) -> &'a Ingredient {
         let mut rng = thread_rng();
+        // TODO Chance to remember a forgotten ingredient.
         if ingredients_left.len() > 1 && rng.gen_bool(0.05) {
             &ingredients_left[1]
         } else {

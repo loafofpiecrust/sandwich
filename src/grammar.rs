@@ -1,4 +1,4 @@
-use crate::sandwich::Ingredient;
+use crate::sandwich::{Sandwich,Ingredient};
 use crate::state::{Idle, State};
 use nom::{
     bytes::complete::*, character::complete::*, combinator::*, multi::*, named, one_of,
@@ -52,12 +52,12 @@ impl Default for Context {
     }
 }
 impl Context {
-    pub fn respond(&mut self, input: &AnnotatedPhrase) -> String {
-        let (response, next_state) = self.state.respond(input, &self.dictionary);
+    pub fn respond(&mut self, input: &AnnotatedPhrase) -> (String, Option<Sandwich>) {
+        let (response, sandwich, next_state) = self.state.respond(input, &self.dictionary);
         if let Some(next) = next_state {
             self.state = next;
         }
-        response
+        (response, sandwich)
     }
 }
 
@@ -65,6 +65,7 @@ impl Context {
 pub enum WordFunction {
     Greeting,
     Affirmation,
+    Negation,
     Pronoun,
     Action,
     Desire,

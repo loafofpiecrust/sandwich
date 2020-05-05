@@ -4,6 +4,9 @@ loha: # Hello, goodbye
 noha: # yes
   function: Affirmation
   role: Special
+no: # no
+  function: Negation
+  role: Special
 meha: # me, I
   function: Pronoun
   role: Noun

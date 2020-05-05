@@ -2,7 +2,7 @@
 /// specified by name.
 ///
 /// # Specification
-/// Basic Phrase: add cheese
-/// Modified Phrase: after avocado add cheese
+/// Basic Phrase: add cheese (cheese want)
+/// Modified Phrase: after avocado add cheese (avocado after cheese want)
 /// Upon hearing:
 pub struct AddAfter {}

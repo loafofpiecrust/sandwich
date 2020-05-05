@@ -4,8 +4,9 @@ use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use serde_yaml;
 use std::fs::File;
+use itertools::Itertools;
 
-#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Ingredient {
     name: String,
     morpheme: String,
@@ -19,7 +20,7 @@ impl Ingredient {
 
     pub fn random(&self) -> &Ingredient {
         if let Some(children) = &self.children {
-            children.choose(&mut rand::thread_rng()).unwrap().random()
+            children.choose(&mut thread_rng()).unwrap().random()
         } else {
             &self
         }
@@ -60,7 +61,7 @@ impl Ingredient {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default, Clone)]
 pub struct Sandwich {
     pub ingredients: Vec<Ingredient>,
 }
@@ -70,7 +71,7 @@ impl Sandwich {
     }
     pub fn random(all_ingredients: &Ingredient, len: usize) -> Self {
         Self {
-            ingredients: (0..len).map(|_| all_ingredients.random().clone()).collect(),
+            ingredients: (0..).map(|_| all_ingredients.random().clone()).unique().take(len).collect(),
         }
     }
     pub fn to_words(&self, dictionary: &Dictionary) -> Vec<String> {
@@ -84,4 +85,9 @@ impl Sandwich {
             })
             .collect()
     }
+}
+
+pub trait SandwichRule {
+    /// Whether the given ingredient is allowed to be next on the given sandwich so far.
+    fn ingredient_allowed(&self, sandwich: &Sandwich, ingredient: &Ingredient);
 }
