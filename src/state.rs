@@ -22,13 +22,13 @@ impl State for Idle {
             // Only respond if being properly greeted.
             if entry.function == WordFunction::Greeting {
                 return (
-                    dict.first_word_in_class(WordFunction::Greeting),
+                    dict.first_word_in_class(WordFunction::Greeting).into(),
                     None,
                     Some(Box::new(SandwichOrder::new())),
                 );
             }
         }
-        (dict.first_word_in_class(WordFunction::Negation), None, None)
+        (dict.first_word_in_class(WordFunction::Negation).into(), None, None)
     }
 }
 
@@ -56,7 +56,7 @@ impl State for SandwichOrder {
                 println!("{:?}", self.sandwich);
                 // End the conversation.
                 return (
-                    dict.first_word_in_class(WordFunction::Greeting),
+                    dict.first_word_in_class(WordFunction::Greeting).into(),
                     Some(self.sandwich.clone()),
                     Some(Box::new(Idle)),
                 );
@@ -64,9 +64,9 @@ impl State for SandwichOrder {
                 let ingredient = dict.ingredients.from_word(&word.word);
                 // TODO: Add the given ingredient to the sandwich order.
                 self.sandwich.ingredients.push(ingredient.clone());
-                return (dict.first_word_in_class(WordFunction::Affirmation), None, None);
+                return (dict.first_word_in_class(WordFunction::Affirmation).into(), None, None);
             }
         }
-        (dict.first_word_in_class(WordFunction::Negation), None, None)
+        (dict.first_word_in_class(WordFunction::Negation).into(), None, None)
     }
 }

@@ -25,10 +25,10 @@ impl Dictionary {
             ingredients: Ingredient::all(),
         }
     }
-    pub fn first_word_in_class(&self, category: WordFunction) -> String {
+    pub fn first_word_in_class(&self, category: WordFunction) -> &str {
         for (word, entry) in &self.words {
             if entry.function == category {
-                return word.clone();
+                return &word;
             }
         }
         unreachable!("There should be at least one word per function.")

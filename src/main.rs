@@ -19,7 +19,7 @@ fn main() -> anyhow::Result<()> {
     let mut server = Client::default();
     let mut client = Client::default();
 
-    // client.add_behavior(Box::new(behavior::Forgetful));
+    client.add_behavior(Box::new(behavior::Forgetful::default()));
 
     random_encounter(client, server)
     // interactive(client, server)

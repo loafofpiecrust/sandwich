@@ -1,5 +1,5 @@
 [package]
-name = "sammich-2"
+name = "sandwich"
 version = "0.1.0"
 authors = ["Taylor Snead <taylorsnead@gmail.com>"]
 edition = "2018"
@@ -12,6 +12,6 @@ futures = "0.3"
 itertools = "*"
 nom = "*"
 serde_yaml = "*"
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
 derive_deref = "*"
 rand = "*"

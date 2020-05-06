@@ -23,18 +23,18 @@ impl Client {
             b.start();
         }
     }
-    pub fn end_order(&mut self, other: &mut Client) {
+    pub fn end_order(&mut self, other: &mut Client) -> f64 {
         for b in &self.behaviors {
             b.end();
         }
-        if let Some(result) = self.greet(other) {
-            let score = self.judge_sandwich(&result);
-            println!("sandwich score: {}", score);
-        }
+        let score = self.greet(other).map(|x| self.judge_sandwich(&x)).unwrap_or(0.0);
+        println!("sandwich score: {}", score);
         self.sandwich = None;
+        score
     }
     fn greet(&self, other: &mut Client) -> Option<Sandwich> {
-        let greeting = grammar::phrase("loha".as_bytes());
+        let hello = self.context.dictionary.first_word_in_class(WordFunction::Greeting);
+        let greeting = grammar::phrase(hello.as_bytes());
         if let Ok((_, phrase)) = greeting {
             let parsed = grammar::annotate(&phrase, &self.context);
             let (resp, sandwich) = other.context.respond(&parsed);
@@ -48,7 +48,7 @@ impl Client {
         let sandwich = self.sandwich.as_ref().unwrap();
         let mut ingredients_left: Vec<_> = sandwich
             .ingredients
-            .iter()
+            .iter().cloned()
             // Take only the trailing ingredients that aren't filled yet.
             // This supports forgetting ingredients if skipped.
             .rev()
@@ -60,16 +60,20 @@ impl Client {
             return None;
         }
 
-        let mut next_ingredient = ingredients_left[0];
+        let mut next_ingredient = Some(ingredients_left.remove(0));
         // Allow behavior to change what the next ingredient might be.
-        for b in &self.behaviors {
-            next_ingredient = b.next_ingredient(&ingredients_left, next_ingredient);
+        for b in &mut self.behaviors {
+            next_ingredient = b.next_ingredient(&mut ingredients_left, next_ingredient);
         }
-        self.filled_ingredients.push(next_ingredient.clone());
-        self.context
-            .dictionary
-            .ingredients
-            .to_word(next_ingredient, "".into())
+
+        next_ingredient.map(|ingredient| {
+            let word = self.context
+                .dictionary
+                .ingredients
+                .to_word(&ingredient, "".into());
+            self.filled_ingredients.push(ingredient);
+            word
+        }).flatten()
     }
 
     /// Returns a score for the match between the sandwich we wanted and the sandwich we got.
@@ -103,7 +107,7 @@ impl Client {
             self.context.respond(&annotated)
         } else {
             // TODO use dictionary for all responses.
-            (self.context.dictionary.first_word_in_class(WordFunction::Negation), None)
+            (self.context.dictionary.first_word_in_class(WordFunction::Negation).into(), None)
         }
     }
 }
