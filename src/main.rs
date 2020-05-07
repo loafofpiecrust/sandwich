@@ -63,12 +63,13 @@ fn random_encounter(mut client: Client, mut server: Client) -> anyhow::Result<()
         let line = format!("{} {}", word, verb);
         for w in line.split(" ") {
             audio::play_word(w)?;
+            thread::sleep(Duration::from_millis(100));
         }
         // display the sentence for debugging.
         let sentence = grammar::sentence(line.as_bytes(), &client.context);
         dbg!(sentence);
 
-        thread::sleep(Duration::from_millis(300));
+        thread::sleep(Duration::from_millis(700));
 
         let (response, sandwich) = server.respond(&line);
         println!("{}", response);

@@ -47,7 +47,7 @@ pub fn play_word(word: &str) -> anyhow::Result<()> {
     for (a, b) in word.chars().tuples() {
         play_sound(
             (consonant_sound(a), vowel_sound(b)),
-            Duration::from_millis(250),
+            Duration::from_millis(150),
         )?;
     }
     Ok(())
