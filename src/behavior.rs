@@ -29,8 +29,8 @@ impl Behavior for Forgetful {
         // TODO Chance to remember a forgotten ingredient.
         if rng.gen_bool(0.05) && !self.forgotten.is_empty() {
             Some(self.forgotten.remove(0))
-        } else if ingredients_left.len() > 1 && rng.gen_bool(0.10) {
-            self.forgotten.push(ingredients_left.remove(0));
+        } else if pick.is_some() && ingredients_left.len() > 1 && rng.gen_bool(0.10) {
+            self.forgotten.push(pick.unwrap());
             Some(ingredients_left.remove(0))
         } else {
             pick
