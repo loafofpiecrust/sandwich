@@ -129,12 +129,15 @@ pub struct AnnotatedWord {
     pub entry: Option<DictionaryEntry>,
 }
 
+pub static CONSONANTS: &str = "ptkhmnwl";
+pub static VOWELS: &str = "aioue";
+
 fn consonant(input: &[u8]) -> IResult<&[u8], char> {
-    character::complete::one_of("ptkhmnwl")(input)
+    character::complete::one_of(CONSONANTS)(input)
 }
 
 fn vowel(input: &[u8]) -> IResult<&[u8], char> {
-    character::complete::one_of("aioue")(input)
+    character::complete::one_of(VOWELS)(input)
 }
 
 pub fn syllable(input: &[u8]) -> IResult<&[u8], Syllable> {
