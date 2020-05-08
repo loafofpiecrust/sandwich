@@ -16,3 +16,4 @@ serde = { version = "1", features = ["derive"] }
 derive_deref = "*"
 rand = "*"
 cpal = {git = "https://github.com/RustAudio/cpal"}
+seqalign = "*"

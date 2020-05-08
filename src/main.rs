@@ -54,13 +54,7 @@ fn random_encounter(mut client: Client, mut server: Client) -> anyhow::Result<()
     dbg!(&client.sandwich);
 
     // List all the ingredients I want.
-    while let Some(word) = client.next_phrase() {
-        println!("ingredient: {}", word);
-        let verb = client
-            .context
-            .dictionary
-            .first_word_in_class(WordFunction::Desire);
-        let line = format!("{} {}", word, verb);
+    while let Some(line) = client.next_phrase() {
         for w in line.split(" ") {
             audio::play_word(w)?;
             thread::sleep(Duration::from_millis(100));
