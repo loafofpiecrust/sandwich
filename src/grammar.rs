@@ -130,7 +130,7 @@ pub struct AnnotatedWord {
     pub entry: Option<DictionaryEntry>,
 }
 
-pub static CONSONANTS: &str = "ptkhmnwl";
+pub static CONSONANTS: &str = "ptkhmnwls";
 pub static VOWELS: &str = "aioue";
 
 fn consonant(input: &[u8]) -> IResult<&[u8], char> {

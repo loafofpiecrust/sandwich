@@ -1,4 +1,6 @@
-use crate::behavior::{PositionedIngredient, DesireEncoder, Behavior, Encoder};
+use crate::behavior::{
+    Behavior, DesireEncoder, Encoder, OrderStatus, PositionedIngredient, RelativeEncoder,
+};
 use crate::grammar::WordFunction;
 use crate::sandwich::{Ingredient, Sandwich};
 use crate::{behavior, grammar, sandwich};
@@ -10,6 +12,7 @@ pub struct Client {
     behaviors: Vec<Box<dyn Behavior>>,
     encoder: Box<dyn Encoder>,
     pub sandwich: Option<Sandwich>,
+    pub history: Vec<usize>,
     next_index: usize,
 }
 impl Client {
@@ -17,7 +20,8 @@ impl Client {
         Self {
             context: Default::default(),
             behaviors: Vec::new(),
-            encoder: Box::new(DesireEncoder),
+            history: Vec::new(),
+            encoder: Box::new(RelativeEncoder::new(DesireEncoder)),
             sandwich: None,
             next_index: 0,
         }
@@ -67,10 +71,6 @@ impl Client {
     pub fn next_phrase(&mut self) -> Option<String> {
         let sandwich = self.sandwich.as_ref().unwrap();
 
-        if self.next_index >= sandwich.ingredients.len() {
-            return None;
-        }
-
         let mut next_ingredient = Some(self.next_index);
         // Allow behavior to change what the next ingredient might be.
         for b in &mut self.behaviors {
@@ -78,11 +78,20 @@ impl Client {
         }
 
         if let Some(idx) = next_ingredient {
-            self.next_index = idx + 1;
-            Some(self.encoder.encode(&self.context, PositionedIngredient {
-                sandwich: sandwich,
-                index: idx,
-            }))
+            if idx >= sandwich.ingredients.len() {
+                return None;
+            }
+            let result = Some(self.encoder.encode(
+                &self.context,
+                PositionedIngredient {
+                    sandwich: sandwich,
+                    index: idx,
+                    history: &self.history[..],
+                },
+            ));
+            self.history.push(idx);
+            self.next_index = self.history.iter().max().unwrap_or(&0) + 1;
+            result
         } else {
             None
         }

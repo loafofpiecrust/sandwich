@@ -10,6 +10,9 @@ no: # no
 meha: # me, I
   function: Pronoun
   role: Noun
+sa:
+  function: After
+  role: Preposition
 nu: # to want
   role: Verb
   function: Desire
