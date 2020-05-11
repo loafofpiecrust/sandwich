@@ -1,7 +1,7 @@
-use crate::sandwich::{Sandwich,Ingredient};
+use crate::sandwich::{Ingredient, Sandwich};
 use crate::state::{Idle, State};
 use nom::{
-    bytes::complete::*, character::complete::*, combinator::*, multi::*, named, one_of,
+    branch::*, bytes::complete::*, character::complete::*, combinator::*, multi::*, named, one_of,
     sequence::*, take_while, ws, IResult, *,
 };
 use serde::{Deserialize, Serialize};
@@ -69,6 +69,7 @@ pub enum WordFunction {
     Pronoun,
     Action,
     Desire,
+    After,
     // Lexical Functions
     /// Has some meaning beyond function.
     Ingredient,
@@ -140,10 +141,18 @@ fn vowel(input: &[u8]) -> IResult<&[u8], char> {
     character::complete::one_of(VOWELS)(input)
 }
 
-pub fn syllable(input: &[u8]) -> IResult<&[u8], Syllable> {
+pub fn syllable_cv(input: &[u8]) -> IResult<&[u8], Syllable> {
     let (input, c) = consonant(input)?;
     let (input, v) = vowel(input)?;
     Ok((input, Syllable(c, v)))
+}
+pub fn syllable_vc(input: &[u8]) -> IResult<&[u8], Syllable> {
+    let (input, c) = vowel(input)?;
+    let (input, v) = consonant(input)?;
+    Ok((input, Syllable(c, v)))
+}
+pub fn syllable(input: &[u8]) -> IResult<&[u8], Syllable> {
+    alt((syllable_cv, syllable_vc))(input)
 }
 
 pub fn word(input: &[u8]) -> IResult<&[u8], Word> {

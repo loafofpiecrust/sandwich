@@ -19,8 +19,8 @@ use std::time::Duration;
 
 fn main() -> anyhow::Result<()> {
     // First we need to establish communication with a greeting.
-    let mut server = Client::default();
-    let mut client = Client::default();
+    let mut server = Client::new();
+    let mut client = Client::new();
 
     client.add_behavior(Box::new(behavior::Forgetful::default()));
 

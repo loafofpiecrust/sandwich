@@ -1,18 +1,27 @@
-use crate::behavior::Behavior;
+use crate::behavior::{PositionedIngredient, DesireEncoder, Behavior, Encoder};
 use crate::grammar::WordFunction;
 use crate::sandwich::{Ingredient, Sandwich};
 use crate::{behavior, grammar, sandwich};
 use itertools::zip;
 use seqalign::{measures::LevenshteinDamerau, Align};
 
-#[derive(Default)]
 pub struct Client {
     pub context: grammar::Context,
     behaviors: Vec<Box<dyn Behavior>>,
+    encoder: Box<dyn Encoder>,
     pub sandwich: Option<Sandwich>,
-    ingredients_left: Vec<Ingredient>,
+    next_index: usize,
 }
 impl Client {
+    pub fn new() -> Self {
+        Self {
+            context: Default::default(),
+            behaviors: Vec::new(),
+            encoder: Box::new(DesireEncoder),
+            sandwich: None,
+            next_index: 0,
+        }
+    }
     pub fn invent_sandwich(&self) -> Sandwich {
         Sandwich::random(&self.context.dictionary.ingredients, 5)
     }
@@ -21,7 +30,7 @@ impl Client {
     }
     pub fn start_order(&mut self, other: &mut Client) {
         let sammich = self.invent_sandwich();
-        self.ingredients_left = sammich.ingredients.clone();
+        self.next_index = 0;
         self.sandwich = Some(sammich);
         self.greet(other);
         for b in &self.behaviors {
@@ -58,34 +67,25 @@ impl Client {
     pub fn next_phrase(&mut self) -> Option<String> {
         let sandwich = self.sandwich.as_ref().unwrap();
 
-        if self.ingredients_left.is_empty() {
+        if self.next_index >= sandwich.ingredients.len() {
             return None;
         }
 
-        let mut next_ingredient = Some(self.ingredients_left.remove(0));
+        let mut next_ingredient = Some(self.next_index);
         // Allow behavior to change what the next ingredient might be.
         for b in &mut self.behaviors {
-            next_ingredient = b.next_ingredient(&mut self.ingredients_left, next_ingredient);
+            next_ingredient = b.next_ingredient(sandwich, next_ingredient);
         }
 
-        let obj = next_ingredient
-            .map(|ingredient| {
-                let word = self
-                    .context
-                    .dictionary
-                    .ingredients
-                    .to_word(&ingredient, "".into());
-                word
-            })
-            .flatten();
-
-        obj.map(|obj| {
-            let verb = self
-                .context
-                .dictionary
-                .first_word_in_class(WordFunction::Desire);
-            format!("{} {}", obj, verb)
-        })
+        if let Some(idx) = next_ingredient {
+            self.next_index = idx + 1;
+            Some(self.encoder.encode(&self.context, PositionedIngredient {
+                sandwich: sandwich,
+                index: idx,
+            }))
+        } else {
+            None
+        }
     }
 
     /// Returns a score for the match between the sandwich we wanted and the sandwich we got.
