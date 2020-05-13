@@ -15,8 +15,6 @@ serde_yaml = "*"
 serde = { version = "1", features = ["derive"] }
 derive_deref = "*"
 rand = "*"
-cpal = {git = "https://github.com/RustAudio/cpal"}
+rodio = "0.11"
 seqalign = "*"
-mdns = "*"
-tokio = { version = "0.2", features = ["full"]}
 bincode = "*"
