@@ -1,12 +1,12 @@
 use crate::grammar::*;
+use itertools::Itertools;
 use rand::prelude::*;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use serde_yaml;
 use std::fs::File;
-use itertools::Itertools;
 
-#[derive(Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Ingredient {
     name: String,
     morpheme: String,
@@ -61,7 +61,7 @@ impl Ingredient {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Sandwich {
     pub ingredients: Vec<Ingredient>,
 }
@@ -71,7 +71,11 @@ impl Sandwich {
     }
     pub fn random(all_ingredients: &Ingredient, len: usize) -> Self {
         Self {
-            ingredients: (0..).map(|_| all_ingredients.random().clone()).unique().take(len).collect(),
+            ingredients: (0..)
+                .map(|_| all_ingredients.random().clone())
+                .unique()
+                .take(len)
+                .collect(),
         }
     }
     pub fn to_words(&self, dictionary: &Dictionary) -> Vec<String> {

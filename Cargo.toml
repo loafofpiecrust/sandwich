@@ -17,3 +17,6 @@ derive_deref = "*"
 rand = "*"
 cpal = {git = "https://github.com/RustAudio/cpal"}
 seqalign = "*"
+mdns = "*"
+tokio = { version = "0.2", features = ["full"]}
+bincode = "*"

@@ -4,8 +4,11 @@ use crate::behavior::{
 use crate::grammar::WordFunction;
 use crate::sandwich::{Ingredient, Sandwich};
 use crate::{behavior, grammar, sandwich};
+use bincode;
 use itertools::zip;
 use seqalign::{measures::LevenshteinDamerau, Align};
+use std::io::{Read, Write};
+use std::net::TcpStream;
 
 pub struct Client {
     pub context: grammar::Context,
@@ -32,7 +35,7 @@ impl Client {
     pub fn add_behavior(&mut self, b: Box<dyn Behavior>) {
         self.behaviors.push(b);
     }
-    pub fn start_order(&mut self, other: &mut Client) {
+    pub fn start_order(&mut self, other: &mut TcpStream) {
         let sammich = self.invent_sandwich();
         self.next_index = 0;
         self.sandwich = Some(sammich);
@@ -41,7 +44,7 @@ impl Client {
             b.start();
         }
     }
-    pub fn end_order(&mut self, other: &mut Client) -> f64 {
+    pub fn end_order(&mut self, other: &mut TcpStream) -> f64 {
         for b in &self.behaviors {
             b.end();
         }
@@ -53,20 +56,30 @@ impl Client {
         self.sandwich = None;
         score
     }
-    fn greet(&self, other: &mut Client) -> Option<Sandwich> {
+    fn greet(&self, other: &mut TcpStream) -> Option<Sandwich> {
         let hello = self
             .context
             .dictionary
             .first_word_in_class(WordFunction::Greeting);
-        let greeting = grammar::phrase(hello.as_bytes());
-        if let Ok((_, phrase)) = greeting {
-            let parsed = grammar::annotate(&phrase, &self.context);
-            let (resp, sandwich) = other.context.respond(&parsed);
-            println!("{}", resp);
-            sandwich
-        } else {
-            None
-        }
+        // Send the phrase over...
+        let mut buf = [0; 512];
+        bincode::serialize_into(&mut buf as &mut [u8], &hello);
+        other.write(&buf);
+
+        // And wait for a response!
+        let resp: String = {
+            buf = [0; 512];
+            other.read(&mut buf);
+            bincode::deserialize(&buf).unwrap()
+        };
+        let sandwich: Option<Sandwich> = {
+            buf = [0; 512];
+            other.read(&mut buf);
+            bincode::deserialize(&buf).unwrap()
+        };
+
+        println!("{}", resp);
+        sandwich
     }
     pub fn next_phrase(&mut self) -> Option<String> {
         let sandwich = self.sandwich.as_ref().unwrap();
