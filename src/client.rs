@@ -35,28 +35,29 @@ impl Client {
     pub fn add_behavior(&mut self, b: Box<dyn Behavior>) {
         self.behaviors.push(b);
     }
-    pub fn start_order(&mut self, other: &mut TcpStream) {
+    pub fn start_order(&mut self, other: &mut TcpStream) -> anyhow::Result<()> {
         let sammich = self.invent_sandwich();
         self.next_index = 0;
         self.sandwich = Some(sammich);
-        self.greet(other);
+        self.greet(other)?;
         for b in &self.behaviors {
             b.start();
         }
+        Ok(())
     }
-    pub fn end_order(&mut self, other: &mut TcpStream) -> f64 {
+    pub fn end_order(&mut self, other: &mut TcpStream) -> anyhow::Result<f64> {
         for b in &self.behaviors {
             b.end();
         }
         let score = self
-            .greet(other)
+            .greet(other)?
             .map(|x| self.judge_sandwich(&x))
             .unwrap_or(0.0);
         println!("sandwich score: {}", score);
         self.sandwich = None;
-        score
+        Ok(score)
     }
-    fn greet(&self, other: &mut TcpStream) -> Option<Sandwich> {
+    fn greet(&self, other: &mut TcpStream) -> anyhow::Result<Option<Sandwich>> {
         let hello = self
             .context
             .dictionary
@@ -79,7 +80,7 @@ impl Client {
         };
 
         println!("{}", resp);
-        sandwich
+        Ok(sandwich)
     }
     pub fn next_phrase(&mut self) -> Option<String> {
         let sandwich = self.sandwich.as_ref().unwrap();

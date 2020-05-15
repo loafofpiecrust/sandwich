@@ -61,44 +61,9 @@ fn server() -> anyhow::Result<()> {
     }
 }
 
-fn interactive(client: Client, mut server: TcpStream) -> anyhow::Result<()> {
-    let stdin = io::stdin();
-    for line in stdin.lock().lines() {
-        let line = line?;
-        if line.is_empty() {
-            break;
-        }
-
-        // display the sentence for debugging.
-        let sentence = grammar::sentence(line.as_bytes(), &client.context);
-        dbg!(sentence);
-
-        // Send the other machine our request.
-        server.write(line.as_bytes())?;
-
-        // Then wait for a response...
-        // The server will first send their words, then the sandwich (if any).
-        // Each piece of this response is 512 bytes, totalling 1KB.
-        let response: String = {
-            let mut buffer = [0; 512];
-            server.read(&mut buffer)?;
-            bincode::deserialize(&buffer)?
-        };
-        let sandwich: Option<Sandwich> = {
-            let mut buffer = [0; 512];
-            server.read(&mut buffer)?;
-            bincode::deserialize(&buffer)?
-        };
-
-        println!("{}", response);
-        dbg!(sandwich);
-    }
-    Ok(())
-}
-
 fn random_encounter(mut client: Client, mut server: TcpStream) -> anyhow::Result<()> {
     // Initial greeting phase!
-    client.start_order(&mut server);
+    client.start_order(&mut server)?;
 
     dbg!(&client.sandwich);
 
@@ -134,7 +99,7 @@ fn random_encounter(mut client: Client, mut server: TcpStream) -> anyhow::Result
     }
 
     // Say goodbye!
-    client.end_order(&mut server);
+    client.end_order(&mut server)?;
 
     Ok(())
 }
