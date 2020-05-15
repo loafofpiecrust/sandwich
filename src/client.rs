@@ -3,7 +3,7 @@ use crate::behavior::{
 };
 use crate::grammar::WordFunction;
 use crate::sandwich::{Ingredient, Sandwich};
-use crate::{behavior, grammar, sandwich};
+use crate::{audio, behavior, grammar, sandwich};
 use bincode;
 use itertools::zip;
 use seqalign::{measures::LevenshteinDamerau, Align};
@@ -80,6 +80,7 @@ impl Client {
         };
 
         println!("{}", resp);
+        audio::play_phrase(&resp)?;
         Ok(sandwich)
     }
     pub fn next_phrase(&mut self) -> Option<String> {

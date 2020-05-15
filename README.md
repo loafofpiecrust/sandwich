@@ -16,3 +16,5 @@ This project is written in Rust managed by Cargo, so to build everything simply 
 ```sh
 cargo build
 ```
+
+All the machines connect by hostname on the port `34222` to keep everything simple.
