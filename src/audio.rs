@@ -21,6 +21,14 @@ pub fn play_sound(frequencies: (f32, f32), duration: Duration) -> anyhow::Result
     Ok(())
 }
 
+pub fn play_phrase(phrase: &str) -> anyhow::Result<()> {
+    for w in phrase.split(" ") {
+        play_word(w)?;
+        thread::sleep(Duration::from_millis(100));
+    }
+    Ok(())
+}
+
 /// Assumes strict CV syllable structure for now.
 pub fn play_word(word: &str) -> anyhow::Result<()> {
     for (a, b) in word.chars().tuples() {

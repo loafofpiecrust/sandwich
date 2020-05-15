@@ -6,14 +6,14 @@ const SANDWICH_PORT: u16 = 34222;
 
 pub fn find_peer() -> std::io::Result<TcpStream> {
     // TODO templatize this string!
-    let url = "SANDWICH1.local:34222";
+    let url = "sandwich2.local:34222";
     let mut stream = TcpStream::connect(url)?;
     config_stream(&mut stream)?;
     Ok(stream)
 }
 
 pub fn wait_for_peer() -> std::io::Result<TcpStream> {
-    let mut conn = TcpListener::bind("127.0.0.1:34222")?;
+    let mut conn = TcpListener::bind("0.0.0.0:34222")?;
     let (mut stream, addr) = conn.accept()?;
     println!("Client connected!!");
     config_stream(&mut stream)?;

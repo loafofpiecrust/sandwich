@@ -49,6 +49,8 @@ fn server() -> anyhow::Result<()> {
         // Then respond with words and maybe a sandwich.
         let (resp, sandwich) = client.respond(&request);
         println!("Responding with {}", resp);
+        audio::play_phrase(&resp)?;
+
         buf = [0; 512];
         bincode::serialize_into(&mut buf as &mut [u8], &resp)?;
         stream.write(&buf)?;
@@ -103,18 +105,15 @@ fn random_encounter(mut client: Client, mut server: TcpStream) -> anyhow::Result
     // List all the ingredients I want.
     while let Some(line) = client.next_phrase() {
         // play the word out loud.
-        for w in line.split(" ") {
-            audio::play_word(w)?;
-            thread::sleep(Duration::from_millis(100));
-        }
+        audio::play_phrase(&line)?;
         // display the sentence for debugging.
         let sentence = grammar::sentence(line.as_bytes(), &client.context);
         dbg!(sentence);
 
         // Send the other our words.
         let mut buf = [0; 512];
-        bincode::serialize_into(&mut buf as &mut [u8], &line);
-        server.write(&buf);
+        bincode::serialize_into(&mut buf as &mut [u8], &line)?;
+        server.write(&buf)?;
 
         // Wait for a response.
         let response: String = {

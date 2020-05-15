@@ -63,18 +63,18 @@ impl Client {
             .first_word_in_class(WordFunction::Greeting);
         // Send the phrase over...
         let mut buf = [0; 512];
-        bincode::serialize_into(&mut buf as &mut [u8], &hello);
-        other.write(&buf);
+        bincode::serialize_into(&mut buf as &mut [u8], &hello)?;
+        other.write(&buf)?;
 
         // And wait for a response!
         let resp: String = {
             buf = [0; 512];
-            other.read(&mut buf);
+            other.read(&mut buf)?;
             bincode::deserialize(&buf).unwrap()
         };
         let sandwich: Option<Sandwich> = {
             buf = [0; 512];
-            other.read(&mut buf);
+            other.read(&mut buf)?;
             bincode::deserialize(&buf).unwrap()
         };
 
@@ -97,7 +97,7 @@ impl Client {
             let result = Some(self.encoder.encode(
                 &self.context,
                 PositionedIngredient {
-                    sandwich: sandwich,
+                    sandwich,
                     index: idx,
                     history: &self.history[..],
                 },
