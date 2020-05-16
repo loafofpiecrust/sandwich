@@ -71,9 +71,6 @@ fn random_encounter(mut client: Client, mut server: TcpStream) -> anyhow::Result
     while let Some(line) = client.next_phrase() {
         // play the word out loud.
         audio::play_phrase(&line)?;
-        // display the sentence for debugging.
-        let sentence = grammar::sentence(line.as_bytes(), &client.context);
-        dbg!(sentence);
 
         // Send the other our words.
         let mut buf = [0; 512];

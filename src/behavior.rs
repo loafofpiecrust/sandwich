@@ -1,7 +1,9 @@
-use crate::grammar::{self, Context, WordFunction};
+use crate::grammar::{self, AnnotatedWord, Context, PhraseNode, WordFunction, WordRole};
 use crate::sandwich::{Ingredient, Sandwich};
-use crate::Client;
-use itertools::Itertools;
+use nom::{
+    branch::*, bytes::complete::*, character::complete::*, combinator::*, multi::*, named, one_of,
+    sequence::*, take_while, ws, IResult, *,
+};
 use rand;
 use rand::prelude::*;
 
@@ -82,6 +84,10 @@ impl Resolvable {
 /// Each encoder may implement new parsing/encoding features for the language.
 pub trait Encoder {
     fn encode(&mut self, context: &Context, item: PositionedIngredient) -> String;
+    fn noun_phrase<'a>(
+        &self,
+        input: &'a [AnnotatedWord],
+    ) -> IResult<&'a [AnnotatedWord], PhraseNode>;
 }
 
 /// A root encoder.
@@ -97,21 +103,33 @@ impl Encoder for DesireEncoder {
         let verb = context.dictionary.first_word_in_class(WordFunction::Desire);
         format!("{} {}", obj, verb)
     }
+    fn noun_phrase<'a>(
+        &self,
+        input: &'a [AnnotatedWord],
+    ) -> IResult<&'a [AnnotatedWord], PhraseNode> {
+        map(grammar::noun, |n| PhraseNode::NounPhrase(vec![n]))(input)
+    }
+}
+
+pub enum HeadSide {
+    Pre,
+    Post,
 }
 
 pub struct RelativeEncoder {
     inner: Box<dyn Encoder>,
+    side: HeadSide,
 }
 impl RelativeEncoder {
     pub fn new(inner: impl Encoder + 'static) -> Self {
         Self {
             inner: Box::new(inner),
+            side: HeadSide::Post,
         }
     }
 }
 impl Encoder for RelativeEncoder {
     fn encode(&mut self, context: &Context, item: PositionedIngredient) -> String {
-        let ingredient = &item.sandwich.ingredients[item.index];
         let last_order = *item.history.last().unwrap_or(&0);
         println!("Encoding relative maybe? {:?}", item);
         if item.index != last_order && item.index != last_order + 1 && item.index > 0 {
@@ -124,14 +142,45 @@ impl Encoder for RelativeEncoder {
                 .unwrap();
             let prep = context.dictionary.first_word_in_class(WordFunction::After);
             // Syntax is: V'[PP[NP P] V'...]
-            format!(
-                "{} {} {}",
-                prev_word,
-                prep,
-                self.inner.encode(context, item)
-            )
+            match &self.side {
+                HeadSide::Pre => format!(
+                    "{} {} {}",
+                    prep,
+                    prev_word,
+                    self.inner.encode(context, item)
+                ),
+                HeadSide::Post => format!(
+                    "{} {} {}",
+                    prev_word,
+                    prep,
+                    self.inner.encode(context, item)
+                ),
+            }
         } else {
             self.inner.encode(context, item)
         }
+    }
+    fn noun_phrase<'a>(
+        &self,
+        input: &'a [AnnotatedWord],
+    ) -> IResult<&'a [AnnotatedWord], PhraseNode> {
+        let np = |input| self.inner.noun_phrase(input);
+        match &self.side {
+            HeadSide::Pre => map(pair(preposition, np), |(p, np)| {
+                PhraseNode::PositionalPhrase(vec![p, np])
+            })(input),
+            HeadSide::Post => map(pair(np, preposition), |(np, p)| {
+                PhraseNode::PositionalPhrase(vec![np, p])
+            })(input),
+        }
+    }
+}
+
+fn preposition(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], PhraseNode> {
+    if input.len() > 0 && input[0].role == Some(WordRole::Preposition) {
+        let rest = &input[1..];
+        Ok((rest, PhraseNode::Noun(input[0].clone())))
+    } else {
+        Err(nom::Err::Error((input, nom::error::ErrorKind::IsA)))
     }
 }

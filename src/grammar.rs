@@ -1,3 +1,4 @@
+use crate::behavior::Encoder;
 use crate::sandwich::{Ingredient, Sandwich};
 use crate::state::{Idle, State};
 use nom::{
@@ -52,8 +53,9 @@ impl Default for Context {
     }
 }
 impl Context {
-    pub fn respond(&mut self, input: &AnnotatedPhrase) -> (String, Option<Sandwich>) {
-        let (response, sandwich, next_state) = self.state.respond(input, &self.dictionary);
+    pub fn respond(&mut self, input: &str, encoder: &dyn Encoder) -> (String, Option<Sandwich>) {
+        let sentence = sentence(input.as_bytes(), self, encoder).unwrap();
+        let (response, sandwich, next_state) = self.state.respond(&sentence, &self.dictionary);
         if let Some(next) = next_state {
             self.state = next;
         }
@@ -179,10 +181,10 @@ pub fn annotate(phrase: &Phrase, context: &Context) -> AnnotatedPhrase {
     result
 }
 
-pub fn sentence(input: &[u8], context: &Context) -> Option<PhraseNode> {
+pub fn sentence(input: &[u8], context: &Context, encoder: &dyn Encoder) -> Option<PhraseNode> {
     if let Ok((_, parsed)) = phrase(input) {
         let tagged = annotate(&parsed, context);
-        if let Ok((_, tree)) = clause(&tagged) {
+        if let Ok((_, tree)) = clause(&tagged, encoder) {
             Some(tree)
         } else {
             None
@@ -199,6 +201,40 @@ pub enum PhraseNode {
     ClausalPhrase(Vec<PhraseNode>),
     Noun(AnnotatedWord),
     Verb(AnnotatedWord),
+    Position(AnnotatedWord),
+    PositionalPhrase(Vec<PhraseNode>),
+}
+impl PhraseNode {
+    // TODO Handle special phrases like greetings.
+    pub fn main_verb(&self) -> Option<&WordFunction> {
+        use PhraseNode::*;
+        match self {
+            Verb(x) => x.entry.as_ref().map(|e| &e.function),
+            NounPhrase(x) | VerbPhrase(x) | ClausalPhrase(x) | PositionalPhrase(x) => {
+                x.iter().filter_map(|x| x.main_verb()).next()
+            }
+            _ => None,
+        }
+    }
+    pub fn object(&self) -> Option<&AnnotatedWord> {
+        use PhraseNode::*;
+        match self {
+            Noun(x) => Some(x),
+            VerbPhrase(x) => x.iter().filter_map(|x| x.object()).next(),
+            ClausalPhrase(x) => x
+                .iter()
+                .filter_map(|x| {
+                    // Objects only come from the verb phrase, subjects sit outside.
+                    if let VerbPhrase(rest) = x {
+                        x.object()
+                    } else {
+                        None
+                    }
+                })
+                .next(),
+            _ => None,
+        }
+    }
 }
 
 pub fn noun(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], PhraseNode> {
@@ -225,8 +261,11 @@ pub fn noun_phrase(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], PhraseN
 }
 
 /// VP -> (NP) V
-pub fn verb_phrase(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], PhraseNode> {
-    map(pair(opt(noun_phrase), verb), |(np, v)| {
+pub fn verb_phrase<'a>(
+    input: &'a [AnnotatedWord],
+    encoder: &dyn Encoder,
+) -> IResult<&'a [AnnotatedWord], PhraseNode> {
+    map(pair(opt(|i| encoder.noun_phrase(i)), verb), |(np, v)| {
         let mut parts = Vec::new();
         if let Some(np) = np {
             parts.push(np);
@@ -237,10 +276,14 @@ pub fn verb_phrase(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], PhraseN
 }
 
 /// CP -> NP VP
-pub fn clause(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], PhraseNode> {
-    map(pair(noun_phrase, verb_phrase), |(np, vp)| {
-        PhraseNode::ClausalPhrase(vec![np, vp])
-    })(input)
+pub fn clause<'a>(
+    input: &'a [AnnotatedWord],
+    encoder: &dyn Encoder,
+) -> IResult<&'a [AnnotatedWord], PhraseNode> {
+    map(
+        pair(noun_phrase, |i| verb_phrase(i, encoder)),
+        |(np, vp)| PhraseNode::ClausalPhrase(vec![np, vp]),
+    )(input)
 }
 
 struct Parsers {}

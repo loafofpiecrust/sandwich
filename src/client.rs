@@ -128,18 +128,6 @@ impl Client {
     }
 
     pub fn respond(&mut self, prompt: &str) -> (String, Option<Sandwich>) {
-        if let Ok((_, phrase)) = grammar::phrase(prompt.as_bytes()) {
-            let annotated = grammar::annotate(&phrase, &self.context);
-            self.context.respond(&annotated)
-        } else {
-            // TODO use dictionary for all responses.
-            (
-                self.context
-                    .dictionary
-                    .first_word_in_class(WordFunction::Negation)
-                    .into(),
-                None,
-            )
-        }
+        self.context.respond(prompt, &*self.encoder)
     }
 }
