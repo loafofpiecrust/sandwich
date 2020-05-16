@@ -280,10 +280,18 @@ pub fn clause<'a>(
     input: &'a [AnnotatedWord],
     encoder: &dyn Encoder,
 ) -> IResult<&'a [AnnotatedWord], PhraseNode> {
-    map(
-        pair(noun_phrase, |i| verb_phrase(i, encoder)),
-        |(np, vp)| PhraseNode::ClausalPhrase(vec![np, vp]),
-    )(input)
+    alt((
+        // We use different branches here instead of an optional subject because nom
+        // consumes from the left, and we don't want to misidentify an OV sentence as SV.
+        map(
+            |i| verb_phrase(i, encoder),
+            |vp| PhraseNode::ClausalPhrase(vec![vp]),
+        ),
+        map(
+            pair(noun_phrase, |i| verb_phrase(i, encoder)),
+            |(np, vp)| PhraseNode::ClausalPhrase(vec![np, vp]),
+        ),
+    ))(input)
 }
 
 struct Parsers {}

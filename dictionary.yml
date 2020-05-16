@@ -1,6 +1,6 @@
 loha: # Hello, goodbye
   function: Greeting
-  role: Special
+  role: Verb
 noha: # yes
   function: Affirmation
   role: Special
