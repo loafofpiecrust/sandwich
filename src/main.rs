@@ -25,11 +25,12 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn client() -> anyhow::Result<()> {
+    let mut client = Client::new();
+
     println!("Connecting to peer machine!");
     let server = comm::find_peer()?;
     println!("{:?}", server);
     // First we need to establish communication with a greeting.
-    let mut client = Client::new();
 
     client.add_behavior(Box::new(behavior::Forgetful::default()));
 

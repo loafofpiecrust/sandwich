@@ -164,15 +164,17 @@ impl Encoder for RelativeEncoder {
         &self,
         input: &'a [AnnotatedWord],
     ) -> IResult<&'a [AnnotatedWord], PhraseNode> {
-        let np = |input| self.inner.noun_phrase(input);
-        match &self.side {
-            HeadSide::Pre => map(pair(preposition, np), |(p, np)| {
-                PhraseNode::PositionalPhrase(vec![p, np])
-            })(input),
-            HeadSide::Post => map(pair(np, preposition), |(np, p)| {
-                PhraseNode::PositionalPhrase(vec![np, p])
-            })(input),
-        }
+        let pp = |input| match &self.side {
+            HeadSide::Pre => map(
+                pair(preposition, |input| self.inner.noun_phrase(input)),
+                |(p, np)| PhraseNode::PositionalPhrase(vec![p, np]),
+            )(input),
+            HeadSide::Post => map(
+                pair(|input| self.inner.noun_phrase(input), preposition),
+                |(np, p)| PhraseNode::PositionalPhrase(vec![np, p]),
+            )(input),
+        };
+        alt((pp, |input| self.inner.noun_phrase(input)))(input)
     }
 }
 

@@ -18,7 +18,7 @@ impl State for Idle {
         dict: &Dictionary,
     ) -> (String, Option<Sandwich>, Option<Box<dyn State>>) {
         // Only respond if being properly greeted.
-        if let Some(WordFunction::Greeting) = input.main_verb() {
+        if let Some(WordFunction::Greeting) = input.main_verb().and_then(|v| v.definition()) {
             (
                 dict.first_word_in_class(WordFunction::Greeting).into(),
                 None,
@@ -52,7 +52,7 @@ impl State for SandwichOrder {
         dict: &Dictionary,
     ) -> (String, Option<Sandwich>, Option<Box<dyn State>>) {
         // TODO Process positional phrases here too somehow.
-        if let Some(WordFunction::Desire) = input.main_verb() {
+        if let Some(WordFunction::Desire) = input.main_verb().and_then(|v| v.definition()) {
             let word = input.object();
             if let Some(entry) = word.map(|o| o.entry.as_ref()).flatten() {
                 if entry.function == WordFunction::Greeting {

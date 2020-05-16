@@ -61,6 +61,9 @@ impl Context {
         }
         (response, sandwich)
     }
+    pub fn parse(&self, input: &str, encoder: &dyn Encoder) -> Option<PhraseNode> {
+        sentence(input.as_bytes(), self, encoder)
+    }
 }
 
 #[derive(PartialEq, Debug, Copy, Clone, Deserialize)]
@@ -130,6 +133,11 @@ pub struct AnnotatedWord {
     /// Part of speech based on syntactic context
     pub role: Option<WordRole>,
     pub entry: Option<DictionaryEntry>,
+}
+impl AnnotatedWord {
+    pub fn definition(&self) -> Option<&WordFunction> {
+        self.entry.as_ref().map(|e| &e.function)
+    }
 }
 
 pub static CONSONANTS: &str = "ptkhmnwls";
@@ -206,10 +214,10 @@ pub enum PhraseNode {
 }
 impl PhraseNode {
     // TODO Handle special phrases like greetings.
-    pub fn main_verb(&self) -> Option<&WordFunction> {
+    pub fn main_verb(&self) -> Option<&AnnotatedWord> {
         use PhraseNode::*;
         match self {
-            Verb(x) => x.entry.as_ref().map(|e| &e.function),
+            Verb(x) => Some(x),
             NounPhrase(x) | VerbPhrase(x) | ClausalPhrase(x) | PositionalPhrase(x) => {
                 x.iter().filter_map(|x| x.main_verb()).next()
             }
@@ -220,12 +228,14 @@ impl PhraseNode {
         use PhraseNode::*;
         match self {
             Noun(x) => Some(x),
-            VerbPhrase(x) => x.iter().filter_map(|x| x.object()).next(),
+            VerbPhrase(x) | NounPhrase(x) | PositionalPhrase(x) => {
+                x.iter().filter_map(|x| x.object()).next()
+            }
             ClausalPhrase(x) => x
                 .iter()
                 .filter_map(|x| {
                     // Objects only come from the verb phrase, subjects sit outside.
-                    if let VerbPhrase(rest) = x {
+                    if let VerbPhrase(_) = x {
                         x.object()
                     } else {
                         None

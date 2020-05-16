@@ -130,4 +130,7 @@ impl Client {
     pub fn respond(&mut self, prompt: &str) -> (String, Option<Sandwich>) {
         self.context.respond(prompt, &*self.encoder)
     }
+    pub fn parse(&self, prompt: &str) -> Option<grammar::PhraseNode> {
+        self.context.parse(prompt, &*self.encoder)
+    }
 }
