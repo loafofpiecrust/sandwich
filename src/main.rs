@@ -42,9 +42,6 @@ async fn main() -> anyhow::Result<()> {
 
 async fn client(server: TcpStream) -> anyhow::Result<()> {
     let mut client = Client::new();
-    let p = dbg!(client.parse("kupoma sa kuwaku nu"));
-    dbg!(p.as_ref().and_then(|p| p.object()));
-    dbg!(p.as_ref().and_then(|p| p.main_verb()));
 
     client.add_behavior(Box::new(behavior::Forgetful::default()));
 

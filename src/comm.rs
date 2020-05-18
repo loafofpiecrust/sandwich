@@ -12,7 +12,7 @@ pub async fn find_peer() -> std::io::Result<TcpStream> {
     let our_name = ourselves.as_os_str().to_str().unwrap();
     println!("our hostname = {}", our_name);
     loop {
-        let num: usize = thread_rng().gen_range(1, 6);
+        let num: usize = thread_rng().gen_range(1, 4);
         let host = format!("SANDWICH{}", num);
         if host.eq_ignore_ascii_case(our_name) {
             continue;
@@ -20,7 +20,7 @@ pub async fn find_peer() -> std::io::Result<TcpStream> {
 
         println!("Attempting connection with sandwich{}", num);
         let url = format!("{}.local:{}", host, SANDWICH_PORT);
-        let stream = io::timeout(Duration::from_secs(2), TcpStream::connect(url)).await;
+        let stream = io::timeout(Duration::from_secs(1), TcpStream::connect(url)).await;
         if stream.is_ok() {
             return stream;
         }

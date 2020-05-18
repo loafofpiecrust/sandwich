@@ -133,7 +133,6 @@ impl Encoder for RelativeEncoder {
         let last_order = *item.history.last().unwrap_or(&0);
         println!("Encoding relative maybe? {:?}", item);
         if item.index != last_order && item.index != last_order + 1 && item.index > 0 {
-            println!("Encoding relative!");
             let previous = &item.sandwich.ingredients[item.index - 1];
             let prev_word = context
                 .dictionary
@@ -164,7 +163,6 @@ impl Encoder for RelativeEncoder {
         &self,
         input: &'a [AnnotatedWord],
     ) -> IResult<&'a [AnnotatedWord], PhraseNode> {
-        println!("parsing PP");
         let pp = |input| match &self.side {
             HeadSide::Pre => map(
                 pair(preposition, |input| self.inner.noun_phrase(input)),
@@ -182,7 +180,7 @@ impl Encoder for RelativeEncoder {
 fn preposition(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], PhraseNode> {
     if input.len() > 0 && input[0].role == Some(WordRole::Preposition) {
         let rest = &input[1..];
-        Ok((rest, PhraseNode::Noun(input[0].clone())))
+        Ok((rest, PhraseNode::Position(input[0].clone())))
     } else {
         Err(nom::Err::Error((input, nom::error::ErrorKind::IsA)))
     }

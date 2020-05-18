@@ -192,7 +192,7 @@ pub fn annotate(phrase: &Phrase, context: &Context) -> AnnotatedPhrase {
 pub fn sentence(input: &[u8], context: &Context, encoder: &dyn Encoder) -> Option<PhraseNode> {
     if let Ok((_, parsed)) = phrase(input) {
         let tagged = annotate(&parsed, context);
-        println!("{:?}", tagged);
+        std::dbg!(&tagged);
         if let Ok((_, tree)) = clause(&tagged, encoder) {
             Some(tree)
         } else {
@@ -267,9 +267,9 @@ pub fn verb(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], PhraseNode> {
 }
 
 /// NP -> N
-pub fn noun_phrase(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], PhraseNode> {
-    map(noun, |n| PhraseNode::NounPhrase(vec![n]))(input)
-}
+// pub fn noun_phrase(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], PhraseNode> {
+//     map(noun, |n| PhraseNode::NounPhrase(vec![n]))(input)
+// }
 
 /// VP -> (NP) V
 pub fn verb_phrase<'a>(
@@ -299,7 +299,7 @@ pub fn clause<'a>(
             |vp| PhraseNode::ClausalPhrase(vec![vp]),
         ),
         map(
-            pair(noun_phrase, |i| verb_phrase(i, encoder)),
+            pair(|i| encoder.noun_phrase(i), |i| verb_phrase(i, encoder)),
             |(np, vp)| PhraseNode::ClausalPhrase(vec![np, vp]),
         ),
     ))(input)
