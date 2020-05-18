@@ -54,7 +54,7 @@ impl Default for Context {
 }
 impl Context {
     pub fn respond(&mut self, input: &str, encoder: &dyn Encoder) -> (String, Option<Sandwich>) {
-        let sentence = sentence(input.as_bytes(), self, encoder).unwrap();
+        let sentence = self.parse(input, encoder).unwrap();
         let (response, sandwich, next_state) = self.state.respond(&sentence, &self.dictionary);
         if let Some(next) = next_state {
             self.state = next;
