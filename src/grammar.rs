@@ -192,6 +192,7 @@ pub fn annotate(phrase: &Phrase, context: &Context) -> AnnotatedPhrase {
 pub fn sentence(input: &[u8], context: &Context, encoder: &dyn Encoder) -> Option<PhraseNode> {
     if let Ok((_, parsed)) = phrase(input) {
         let tagged = annotate(&parsed, context);
+        println!("{:?}", tagged);
         if let Ok((_, tree)) = clause(&tagged, encoder) {
             Some(tree)
         } else {

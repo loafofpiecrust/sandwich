@@ -7,7 +7,12 @@ mod sandwich;
 mod state;
 
 use anyhow;
+use async_std::net::TcpStream;
+use async_std::prelude::*;
 use client::Client;
+use futures::future::FutureExt;
+use futures::pin_mut;
+use futures::select;
 use grammar::WordFunction;
 use sandwich::{Ingredient, Sandwich};
 use serde_yaml;
@@ -15,36 +20,44 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::fs::{self, File};
 use std::io::{self, prelude::*};
-use std::net::TcpStream;
 use std::thread;
 use std::time::Duration;
 
-fn main() -> anyhow::Result<()> {
-    // server()
-    client()
+#[async_std::main]
+async fn main() -> anyhow::Result<()> {
+    // server()ait_for_peer())
+    let client = comm::find_peer().fuse();
+    let server = comm::wait_for_peer().fuse();
+    pin_mut!(client, server);
+    let (stream, is_client) = select! {
+        s = client => (s, true),
+        s = server => (s, false),
+    };
+    if is_client {
+        self::client(stream?).await
+    } else {
+        self::server(stream?).await
+    }
 }
 
-fn client() -> anyhow::Result<()> {
+async fn client(server: TcpStream) -> anyhow::Result<()> {
     let mut client = Client::new();
-
-    println!("Connecting to peer machine!");
-    let server = comm::find_peer()?;
-    println!("{:?}", server);
-    // First we need to establish communication with a greeting.
+    let p = dbg!(client.parse("kupoma sa kuwaku nu"));
+    dbg!(p.as_ref().and_then(|p| p.object()));
+    dbg!(p.as_ref().and_then(|p| p.main_verb()));
 
     client.add_behavior(Box::new(behavior::Forgetful::default()));
 
-    random_encounter(client, server)
-    // interactive(client, server)
+    // First we need to establish communication with a greeting.
+    random_encounter(client, server).await
 }
 
-fn server() -> anyhow::Result<()> {
+async fn server(mut stream: TcpStream) -> anyhow::Result<()> {
     let mut client = Client::new();
-    let mut stream = comm::wait_for_peer()?;
     loop {
         // Wait for a request,
         let mut buf = [0; 512];
-        stream.read(&mut buf)?;
+        stream.read(&mut buf).await?;
         let request: String = dbg!(bincode::deserialize(&buf)?);
 
         // Then respond with words and maybe a sandwich.
@@ -54,17 +67,17 @@ fn server() -> anyhow::Result<()> {
 
         buf = [0; 512];
         bincode::serialize_into(&mut buf as &mut [u8], &resp)?;
-        stream.write(&buf)?;
+        stream.write(&buf).await?;
 
         buf = [0; 512];
         bincode::serialize_into(&mut buf as &mut [u8], &sandwich)?;
-        stream.write(&buf)?;
+        stream.write(&buf).await?;
     }
 }
 
-fn random_encounter(mut client: Client, mut server: TcpStream) -> anyhow::Result<()> {
+async fn random_encounter(mut client: Client, mut server: TcpStream) -> anyhow::Result<()> {
     // Initial greeting phase!
-    client.start_order(&mut server)?;
+    client.start_order(&mut server).await?;
 
     dbg!(&client.sandwich);
 
@@ -76,17 +89,17 @@ fn random_encounter(mut client: Client, mut server: TcpStream) -> anyhow::Result
         // Send the other our words.
         let mut buf = [0; 512];
         bincode::serialize_into(&mut buf as &mut [u8], &line)?;
-        server.write(&buf)?;
+        server.write(&buf).await?;
 
         // Wait for a response.
         let response: String = {
             let mut buffer = [0; 512];
-            server.read(&mut buffer)?;
+            server.read(&mut buffer).await?;
             bincode::deserialize(&buffer)?
         };
         let sandwich: Option<Sandwich> = {
             let mut buffer = [0; 512];
-            server.read(&mut buffer)?;
+            server.read(&mut buffer).await?;
             bincode::deserialize(&buffer)?
         };
 
@@ -97,7 +110,7 @@ fn random_encounter(mut client: Client, mut server: TcpStream) -> anyhow::Result
     }
 
     // Say goodbye!
-    client.end_order(&mut server)?;
+    client.end_order(&mut server).await?;
 
     Ok(())
 }

@@ -18,3 +18,4 @@ rand = "*"
 rodio = "0.11"
 seqalign = "*"
 bincode = "*"
+async-std = {version = "1.5", features = ["attributes"]}

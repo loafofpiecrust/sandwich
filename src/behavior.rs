@@ -164,6 +164,7 @@ impl Encoder for RelativeEncoder {
         &self,
         input: &'a [AnnotatedWord],
     ) -> IResult<&'a [AnnotatedWord], PhraseNode> {
+        println!("parsing PP");
         let pp = |input| match &self.side {
             HeadSide::Pre => map(
                 pair(preposition, |input| self.inner.noun_phrase(input)),

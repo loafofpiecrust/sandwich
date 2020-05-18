@@ -4,11 +4,12 @@ use crate::behavior::{
 use crate::grammar::WordFunction;
 use crate::sandwich::{Ingredient, Sandwich};
 use crate::{audio, behavior, grammar, sandwich};
+use async_std::io::{Read, Write};
+use async_std::net::TcpStream;
+use async_std::prelude::*;
 use bincode;
 use itertools::zip;
 use seqalign::{measures::LevenshteinDamerau, Align};
-use std::io::{Read, Write};
-use std::net::TcpStream;
 
 pub struct Client {
     pub context: grammar::Context,
@@ -35,29 +36,30 @@ impl Client {
     pub fn add_behavior(&mut self, b: Box<dyn Behavior>) {
         self.behaviors.push(b);
     }
-    pub fn start_order(&mut self, other: &mut TcpStream) -> anyhow::Result<()> {
+    pub async fn start_order(&mut self, other: &mut TcpStream) -> anyhow::Result<()> {
         let sammich = self.invent_sandwich();
         self.next_index = 0;
         self.sandwich = Some(sammich);
-        self.greet(other)?;
+        self.greet(other).await?;
         for b in &self.behaviors {
             b.start();
         }
         Ok(())
     }
-    pub fn end_order(&mut self, other: &mut TcpStream) -> anyhow::Result<f64> {
+    pub async fn end_order(&mut self, other: &mut TcpStream) -> anyhow::Result<f64> {
         for b in &self.behaviors {
             b.end();
         }
         let score = self
-            .greet(other)?
+            .greet(other)
+            .await?
             .map(|x| self.judge_sandwich(&x))
             .unwrap_or(0.0);
         println!("sandwich score: {}", score);
         self.sandwich = None;
         Ok(score)
     }
-    fn greet(&self, other: &mut TcpStream) -> anyhow::Result<Option<Sandwich>> {
+    async fn greet(&self, other: &mut TcpStream) -> anyhow::Result<Option<Sandwich>> {
         let hello = self
             .context
             .dictionary
@@ -65,17 +67,17 @@ impl Client {
         // Send the phrase over...
         let mut buf = [0; 512];
         bincode::serialize_into(&mut buf as &mut [u8], &hello)?;
-        other.write(&buf)?;
+        other.write(&buf).await?;
 
         // And wait for a response!
         let resp: String = {
             buf = [0; 512];
-            other.read(&mut buf)?;
+            other.read(&mut buf).await?;
             bincode::deserialize(&buf).unwrap()
         };
         let sandwich: Option<Sandwich> = {
             buf = [0; 512];
-            other.read(&mut buf)?;
+            other.read(&mut buf).await?;
             bincode::deserialize(&buf).unwrap()
         };
 
