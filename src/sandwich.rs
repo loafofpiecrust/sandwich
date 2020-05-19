@@ -18,6 +18,10 @@ impl Ingredient {
         serde_yaml::from_reader(file).unwrap()
     }
 
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
     pub fn random(&self) -> &Ingredient {
         if let Some(children) = &self.children {
             children.choose(&mut thread_rng()).unwrap().random()

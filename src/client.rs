@@ -3,13 +3,14 @@ use crate::behavior::{
 };
 use crate::grammar::WordFunction;
 use crate::sandwich::{Ingredient, Sandwich};
-use crate::{audio, behavior, grammar, sandwich};
+use crate::{audio, behavior, display::setup_display, grammar, sandwich};
 use async_std::io::{Read, Write};
 use async_std::net::TcpStream;
 use async_std::prelude::*;
 use bincode;
 use itertools::zip;
 use seqalign::{measures::LevenshteinDamerau, Align};
+use std::sync::mpsc::Sender;
 
 pub struct Client {
     pub context: grammar::Context,
@@ -18,6 +19,7 @@ pub struct Client {
     pub sandwich: Option<Sandwich>,
     pub history: Vec<usize>,
     next_index: usize,
+    display_channel: Sender<Vec<Ingredient>>,
 }
 impl Client {
     pub fn new() -> Self {
@@ -28,6 +30,7 @@ impl Client {
             encoder: Box::new(RelativeEncoder::new(DesireEncoder)),
             sandwich: None,
             next_index: 0,
+            display_channel: setup_display(),
         }
     }
     pub fn invent_sandwich(&self) -> Sandwich {
@@ -130,7 +133,8 @@ impl Client {
     }
 
     pub fn respond(&mut self, prompt: &str) -> (String, Option<Sandwich>) {
-        self.context.respond(prompt, &*self.encoder)
+        self.context
+            .respond(prompt, &*self.encoder, &self.display_channel)
     }
     pub fn parse(&self, prompt: &str) -> Option<grammar::PhraseNode> {
         self.context.parse(prompt, &*self.encoder)

@@ -11,6 +11,7 @@ use std::{
     collections::HashMap,
     fmt::{self, Display, Formatter},
     fs::File,
+    sync::mpsc::Sender,
 };
 
 pub struct Dictionary {
@@ -53,9 +54,15 @@ impl Default for Context {
     }
 }
 impl Context {
-    pub fn respond(&mut self, input: &str, encoder: &dyn Encoder) -> (String, Option<Sandwich>) {
+    pub fn respond(
+        &mut self,
+        input: &str,
+        encoder: &dyn Encoder,
+        display: &Sender<Vec<Ingredient>>,
+    ) -> (String, Option<Sandwich>) {
         let sentence = self.parse(input, encoder).unwrap();
-        let (response, sandwich, next_state) = self.state.respond(&sentence, &self.dictionary);
+        let (response, sandwich, next_state) =
+            self.state.respond(&sentence, &self.dictionary, display);
         if let Some(next) = next_state {
             self.state = next;
         }

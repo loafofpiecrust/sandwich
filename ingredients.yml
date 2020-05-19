@@ -4,16 +4,33 @@ children:
 - name: base
   morpheme: po
   children:
-  - name: bagel
+  - name: bottom-bun
     morpheme: lo
-  - name: wheat bread
-    morpheme: ma
-- name: cheese
-  morpheme: wa
+  # - name: wheat bread
+  #   morpheme: ma
+# - name: cheese
+#   morpheme: wa
+#   children:
+#   - name: cheddar
+#     morpheme: ku
+  # - name: swiss cheese
+  #   morpheme: na
+  # - name: mozzerella
+  #   morpheme: me
+- name: sauce
+  morpheme: hi
   children:
-  - name: cheddar
-    morpheme: ku
-  - name: swiss cheese
-    morpheme: na
-  - name: mozzerella
-    morpheme: me
+  - name: sauce
+    morpheme: hi
+- name: greens
+  morpheme: we
+  children:
+  - name: lettuce
+    morpheme: nu
+  - name: onions
+    morpheme: ho
+- name: meat
+  morpheme: la
+  children:
+  - name: chicken
+    morpheme: la

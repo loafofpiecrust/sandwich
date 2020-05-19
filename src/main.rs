@@ -2,6 +2,7 @@ mod audio;
 mod behavior;
 mod client;
 mod comm;
+mod display;
 mod grammar;
 mod sandwich;
 mod state;
@@ -25,7 +26,6 @@ use std::time::Duration;
 
 #[async_std::main]
 async fn main() -> anyhow::Result<()> {
-    // server()ait_for_peer())
     let client = comm::find_peer().fuse();
     let server = comm::wait_for_peer().fuse();
     pin_mut!(client, server);
