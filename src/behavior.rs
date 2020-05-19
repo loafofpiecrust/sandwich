@@ -40,10 +40,10 @@ impl Behavior for Forgetful {
         let mut rng = thread_rng();
         let curr_idx = pick.unwrap_or(0);
         // TODO Chance to remember a forgotten ingredient.
-        if rng.gen_bool(0.5) && !self.forgotten.is_empty() {
+        if rng.gen_bool(0.1) && !self.forgotten.is_empty() {
             println!("remembering!!");
             Some(self.forgotten.remove(0))
-        } else if pick.is_some() && sandwich.ingredients.len() > curr_idx && rng.gen_bool(0.70) {
+        } else if pick.is_some() && sandwich.ingredients.len() > curr_idx && rng.gen_bool(0.1) {
             println!("forgetting!");
             self.forgotten.push(curr_idx);
             if curr_idx + 1 < sandwich.ingredients.len() {
