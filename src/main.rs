@@ -14,13 +14,7 @@ use client::Client;
 use futures::future::FutureExt;
 use futures::pin_mut;
 use futures::select;
-use grammar::WordFunction;
-use sandwich::{Ingredient, Sandwich};
-use serde_yaml;
-use std::collections::HashMap;
-use std::fmt::Display;
-use std::fs::{self, File};
-use std::io::{self, prelude::*};
+use sandwich::Sandwich;
 use std::thread;
 use std::time::Duration;
 
@@ -29,14 +23,9 @@ async fn main() -> anyhow::Result<()> {
     let client = comm::find_peer().fuse();
     let server = comm::wait_for_peer().fuse();
     pin_mut!(client, server);
-    let (stream, is_client) = select! {
-        s = client => (s, true),
-        s = server => (s, false),
-    };
-    if is_client {
-        self::client(stream?).await
-    } else {
-        self::server(stream?).await
+    select! {
+        s = client => self::client(s?).await,
+        s = server => self::server(s?).await,
     }
 }
 

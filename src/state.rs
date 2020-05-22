@@ -63,8 +63,8 @@ impl State for SandwichOrder {
                     word.and_then(|o| o.entry.as_ref()).map(|e| e.function)
                 {
                     let ingredient = dict.ingredients.from_word(&word.unwrap().word);
-                    // TODO: Add the given ingredient to the sandwich order.
                     self.sandwich.ingredients.push(ingredient.clone());
+                    display.send(self.sandwich.ingredients.clone()).unwrap();
                     return (
                         dict.first_word_in_class(WordFunction::Affirmation).into(),
                         None,
@@ -75,7 +75,7 @@ impl State for SandwichOrder {
             Some(WordFunction::Greeting) => {
                 // Represents showing the sandwich to the client.
                 println!("{:?}", self.sandwich);
-                display.send(self.sandwich.ingredients.clone());
+                display.send(self.sandwich.ingredients.clone()).unwrap();
                 // End the conversation.
                 return (
                     dict.first_word_in_class(WordFunction::Greeting).into(),

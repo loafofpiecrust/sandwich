@@ -24,10 +24,31 @@ impl Ingredient {
 
     pub fn random(&self) -> &Ingredient {
         if let Some(children) = &self.children {
-            children.choose(&mut thread_rng()).unwrap().random()
+            children
+                .iter()
+                // Inner ingredients can't be a base.
+                .filter(|x| x.name != "base")
+                .choose(&mut thread_rng())
+                .unwrap()
+                .random()
         } else {
             &self
         }
+    }
+
+    pub fn random_base(&self) -> (&Ingredient, &Ingredient) {
+        self.children
+            .as_ref()
+            // Look for the "base" category.
+            .and_then(|cats| cats.iter().find(|c| c.name == "base"))
+            // Look through all the different bases.
+            .and_then(|b| b.children.as_ref())
+            // Pick a random one.
+            .and_then(|c| c.choose(&mut thread_rng()))
+            // Grab all the children of the base, which should be [bottom, top].
+            .and_then(|b| b.children.as_ref())
+            .and_then(|c| c.iter().tuples().next())
+            .unwrap()
     }
 
     /// Retrieve the ingredient that corresponds to the given word, based on the
@@ -74,13 +95,18 @@ impl Sandwich {
         Self { ingredients }
     }
     pub fn random(all_ingredients: &Ingredient, len: usize) -> Self {
-        Self {
-            ingredients: (0..)
+        // Pick a base first, then the inside ingredients.
+        let mut ingredients = Vec::new();
+        let (bottom, top) = all_ingredients.random_base();
+        ingredients.push(bottom.clone());
+        ingredients.extend(
+            (0..)
                 .map(|_| all_ingredients.random().clone())
                 .unique()
-                .take(len)
-                .collect(),
-        }
+                .take(len),
+        );
+        ingredients.push(top.clone());
+        Self { ingredients }
     }
     pub fn to_words(&self, dictionary: &Dictionary) -> Vec<String> {
         self.ingredients

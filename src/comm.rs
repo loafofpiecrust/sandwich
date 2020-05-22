@@ -5,6 +5,7 @@ use rand::prelude::*;
 use std::time::Duration;
 
 const SANDWICH_PORT: u16 = 34222;
+const HOSTS: &[&str] = &["sandwich2", "loafofpiecrust"];
 
 pub async fn find_peer() -> std::io::Result<TcpStream> {
     // Try connecting to a random peer until it succeeds.
@@ -12,13 +13,12 @@ pub async fn find_peer() -> std::io::Result<TcpStream> {
     let our_name = ourselves.as_os_str().to_str().unwrap();
     println!("our hostname = {}", our_name);
     loop {
-        let num: usize = thread_rng().gen_range(1, 4);
-        let host = format!("SANDWICH{}", num);
+        let host = HOSTS.choose(&mut thread_rng()).unwrap();
         if host.eq_ignore_ascii_case(our_name) {
             continue;
         }
 
-        println!("Attempting connection with sandwich{}", num);
+        println!("Attempting connection with {}", host);
         let url = format!("{}.local:{}", host, SANDWICH_PORT);
         let stream = io::timeout(Duration::from_secs(1), TcpStream::connect(url)).await;
         if stream.is_ok() {

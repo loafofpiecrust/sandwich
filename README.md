@@ -18,3 +18,28 @@ cargo build
 ```
 
 All the machines connect by hostname on the port `34222` to keep everything simple.
+
+
+## Sandwiches
+### Types of Sandwiches
+- American: sliced bread
+  - Bagel sandwich, breakfast sandwich
+- Italian: small rolls sliced in half
+  - subs
+- Quesadilla: different size and cheese melted so hard to compose.
+- Gyro
+- bahn mi
+
+### The Menu
+- Cheeses: cheddar, fresh mozzerella, swiss, provolone, pecorino, feta
+- Proteins: egg, bacon, turkey, falafel, mushroom, ham, pulled pork, salmon, salami, roast beef, beef patty
+- Greens: spinach, arugula, lettuce, cilantro
+- Vegis: green bell pepper, red bell pepper, jalapeno
+- Fruit: tomato, avocado, apple slices, cucumber, eggplant, olives
+- Sauce: mayo, mustard, ketchup, barbeque, gravy, tzatziki
+- Spreads: cream cheese, hummus, pesto
+- Other: red onion, pickled onion, pickled radish, shredded carrot, onion ring
+- Bread: everything bagel, focaccia, baguette, sourdough slices, wheat, english muffin, tortilla, pita
+
+### Starter Sandwiches
+- Breakfast Bagel: everything bagel, fried egg, swiss cheese, avocado

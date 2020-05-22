@@ -17,7 +17,7 @@ pub fn setup_display<'a>() -> Sender<Vec<Ingredient>> {
             factory: window.factory.clone(),
             encoder: window.factory.create_command_buffer().into(),
         };
-        let offset = 20.0;
+        let offset = 1.5;
         let mut textures = Vec::new();
         while let Some(e) = window.next() {
             // Try to receive ingredient updates if there are any.
@@ -29,15 +29,18 @@ pub fn setup_display<'a>() -> Sender<Vec<Ingredient>> {
                             &mut tc,
                             Path::new(&format!("images/{}.png", x.name())),
                             Flip::None,
-                            &TextureSettings::new(),
+                            &TextureSettings::new().filter(Filter::Nearest),
                         )
                         .unwrap()
                     })
                     .collect();
             }
             window.draw_2d(&e, |c, g, d| {
-                clear([0.5, 1.0, 0.5, 1.0], g);
-                let mut curr = c.transform.trans(0.0, textures.len() as f64 * offset);
+                clear([0.0, 0.0, 0.0, 1.0], g);
+                let mut curr = c
+                    .transform
+                    .trans(20.0, textures.len() as f64 * offset + 100.0)
+                    .scale(10.0, 10.0);
                 for t in &textures {
                     image(t, curr, g);
                     curr = curr.trans(0.0, -offset);
