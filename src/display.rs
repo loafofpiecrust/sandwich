@@ -8,7 +8,7 @@ pub fn setup_display<'a>() -> Sender<Vec<Ingredient>> {
     let (sender, receiver) = channel::<Vec<Ingredient>>();
     thread::spawn(move || {
         let mut window: PistonWindow = WindowSettings::new("SANDWICH", (1920, 1080))
-            // .fullscreen(true)
+            .fullscreen(true)
             .automatic_close(true)
             .exit_on_esc(true)
             .build()
