@@ -25,7 +25,7 @@ impl Dictionary {
         let ingredients = Ingredient::all();
         words.extend(ingredients.leaves().into_iter().map(|x| {
             (
-                x.name().into(),
+                x,
                 DictionaryEntry {
                     function: WordFunction::Ingredient,
                     role: WordRole::Noun,

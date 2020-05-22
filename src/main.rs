@@ -32,6 +32,8 @@ async fn main() -> anyhow::Result<()> {
 async fn client(server: TcpStream) -> anyhow::Result<()> {
     let mut client = Client::new();
 
+    println!("{:?}", client.context.dictionary.ingredients.leaves());
+
     client.add_behavior(Box::new(behavior::Forgetful::default()));
 
     // First we need to establish communication with a greeting.
