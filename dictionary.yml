@@ -16,18 +16,3 @@ sa:
 nu: # to want
   role: Verb
   function: Desire
-kupolo: # bagel
-  function: Ingredient
-  role: Noun
-kupoma:
-  function: Ingredient
-  role: Noun
-kuwaku: # cheddar cheese
-  function: Ingredient
-  role: Noun
-kuwana: # swiss
-  function: Ingredient
-  role: Noun
-kuwame: # mozz
-  function: Ingredient
-  role: Noun

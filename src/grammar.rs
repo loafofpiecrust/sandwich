@@ -21,11 +21,19 @@ pub struct Dictionary {
 impl Dictionary {
     pub fn new() -> Self {
         let file = File::open("dictionary.yml").unwrap();
-        let content = serde_yaml::from_reader(file).unwrap();
-        Self {
-            words: content,
-            ingredients: Ingredient::all(),
-        }
+        let mut words: HashMap<String, DictionaryEntry> = serde_yaml::from_reader(file).unwrap();
+        let ingredients = Ingredient::all();
+        words.extend(ingredients.leaves().into_iter().map(|x| {
+            (
+                x.name().into(),
+                DictionaryEntry {
+                    function: WordFunction::Ingredient,
+                    role: WordRole::Noun,
+                },
+            )
+        }));
+
+        Self { words, ingredients }
     }
     pub fn first_word_in_class(&self, category: WordFunction) -> &str {
         for (word, entry) in &self.words {

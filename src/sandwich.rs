@@ -51,6 +51,14 @@ impl Ingredient {
             .unwrap()
     }
 
+    pub fn leaves(&self) -> Vec<&Ingredient> {
+        if let Some(children) = self.children.as_ref() {
+            children.iter().flat_map(|x| x.leaves()).collect()
+        } else {
+            vec![self]
+        }
+    }
+
     /// Retrieve the ingredient that corresponds to the given word, based on the
     /// single-syllable morphemes contained within.
     /// Assumes that syllables and morphemes are always one-to-one.
