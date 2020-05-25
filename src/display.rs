@@ -32,7 +32,7 @@ pub fn setup_display<'a>() -> Sender<Render> {
         let mut subtitles = String::new();
         while let Some(e) = window.next() {
             // Try to receive render updates if there are any.
-            if let Ok(render) = receiver.try_recv() {
+            while let Ok(render) = receiver.try_recv() {
                 println!("{:?}", render);
                 // Convert ingredient name to texture of "images/ingredient-name.png"
                 textures = render
