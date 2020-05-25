@@ -1,14 +1,14 @@
-use crate::behavior::{
-    Behavior, DesireEncoder, Encoder, OrderStatus, PositionedIngredient, RelativeEncoder,
+use crate::{
+    audio,
+    behavior::{Behavior, DesireEncoder, Encoder, PositionedIngredient, RelativeEncoder},
+    display::{setup_display, Render},
+    grammar,
+    grammar::WordFunction,
+    sandwich::Sandwich,
 };
-use crate::grammar::WordFunction;
-use crate::sandwich::{Ingredient, Sandwich};
-use crate::{audio, behavior, display::setup_display, grammar, sandwich};
-use async_std::io::{Read, Write};
 use async_std::net::TcpStream;
 use async_std::prelude::*;
 use bincode;
-use itertools::zip;
 use seqalign::{measures::LevenshteinDamerau, Align};
 use std::sync::mpsc::Sender;
 
@@ -19,7 +19,7 @@ pub struct Client {
     pub sandwich: Option<Sandwich>,
     pub history: Vec<usize>,
     next_index: usize,
-    display_channel: Sender<Vec<Ingredient>>,
+    pub display: Sender<Render>,
 }
 impl Client {
     pub fn new() -> Self {
@@ -30,7 +30,7 @@ impl Client {
             encoder: Box::new(RelativeEncoder::new(DesireEncoder)),
             sandwich: None,
             next_index: 0,
-            display_channel: setup_display(),
+            display: setup_display(),
         }
     }
     pub fn invent_sandwich(&self) -> Sandwich {
@@ -63,7 +63,7 @@ impl Client {
         Ok(score)
     }
     async fn greet(&self, other: &mut TcpStream) -> anyhow::Result<Option<Sandwich>> {
-        let hello = self
+        let (hello, _) = self
             .context
             .dictionary
             .first_word_in_class(WordFunction::Greeting);
@@ -133,8 +133,7 @@ impl Client {
     }
 
     pub fn respond(&mut self, prompt: &str) -> (String, Option<Sandwich>) {
-        self.context
-            .respond(prompt, &*self.encoder, &self.display_channel)
+        self.context.respond(prompt, &*self.encoder, &self.display)
     }
     pub fn parse(&self, prompt: &str) -> Option<grammar::PhraseNode> {
         self.context.parse(prompt, &*self.encoder)

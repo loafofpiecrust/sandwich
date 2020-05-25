@@ -1,18 +1,24 @@
 loha: # Hello, goodbye
   function: Greeting
   role: Verb
+  definition: "hello/goodbye"
 noha: # yes
   function: Affirmation
   role: Special
+  definition: "yes"
 no: # no
   function: Negation
   role: Special
+  definition: "no"
 meha: # me, I
   function: Pronoun
   role: Noun
+  definition: "me"
 sa:
   function: After
   role: Preposition
+  definition: "after"
 nu: # to want
   role: Verb
   function: Desire
+  definition: "want"

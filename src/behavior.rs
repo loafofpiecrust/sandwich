@@ -100,7 +100,7 @@ impl Encoder for DesireEncoder {
             .ingredients
             .to_word(&ingredient, String::new())
             .unwrap();
-        let verb = context.dictionary.first_word_in_class(WordFunction::Desire);
+        let (verb, _) = context.dictionary.first_word_in_class(WordFunction::Desire);
         format!("{} {}", obj, verb)
     }
     fn noun_phrase<'a>(
@@ -139,7 +139,7 @@ impl Encoder for RelativeEncoder {
                 .ingredients
                 .to_word(&previous, String::new())
                 .unwrap();
-            let prep = context.dictionary.first_word_in_class(WordFunction::After);
+            let (prep, _) = context.dictionary.first_word_in_class(WordFunction::After);
             // Syntax is: V'[PP[NP P] V'...]
             match &self.side {
                 HeadSide::Pre => format!(

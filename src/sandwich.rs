@@ -51,18 +51,18 @@ impl Ingredient {
             .unwrap()
     }
 
-    pub fn leaves(&self) -> Vec<String> {
+    pub fn leaves(&self) -> Vec<(String, String)> {
         if let Some(children) = self.children.as_ref() {
             children
                 .iter()
                 .flat_map(|x| {
                     x.leaves()
                         .into_iter()
-                        .map(|x| format!("{}{}", self.morpheme, x))
+                        .map(|(n, x)| (n, format!("{}{}", self.morpheme, x)))
                 })
                 .collect()
         } else {
-            vec![self.morpheme.clone()]
+            vec![(self.name.clone(), self.morpheme.clone())]
         }
     }
 

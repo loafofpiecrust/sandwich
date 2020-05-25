@@ -1,6 +1,8 @@
 use crate::behavior::Encoder;
+use crate::display::Render;
 use crate::sandwich::{Ingredient, Sandwich};
 use crate::state::{Idle, State};
+use itertools::Itertools;
 use nom::{
     branch::*, bytes::complete::*, character::complete::*, combinator::*, multi::*, named, one_of,
     sequence::*, take_while, ws, IResult, *,
@@ -23,22 +25,23 @@ impl Dictionary {
         let file = File::open("dictionary.yml").unwrap();
         let mut words: HashMap<String, DictionaryEntry> = serde_yaml::from_reader(file).unwrap();
         let ingredients = Ingredient::all();
-        words.extend(ingredients.leaves().into_iter().map(|x| {
+        words.extend(ingredients.leaves().into_iter().map(|(n, x)| {
             (
                 x,
                 DictionaryEntry {
                     function: WordFunction::Ingredient,
                     role: WordRole::Noun,
+                    definition: n,
                 },
             )
         }));
 
         Self { words, ingredients }
     }
-    pub fn first_word_in_class(&self, category: WordFunction) -> &str {
+    pub fn first_word_in_class(&self, category: WordFunction) -> (&str, &DictionaryEntry) {
         for (word, entry) in &self.words {
             if entry.function == category {
-                return &word;
+                return (word, entry);
             }
         }
         unreachable!("There should be at least one word per function.")
@@ -66,7 +69,7 @@ impl Context {
         &mut self,
         input: &str,
         encoder: &dyn Encoder,
-        display: &Sender<Vec<Ingredient>>,
+        display: &Sender<Render>,
     ) -> (String, Option<Sandwich>) {
         let sentence = self.parse(input, encoder).unwrap();
         let (response, sandwich, next_state) =
@@ -117,6 +120,7 @@ pub enum WordRole {
 pub struct DictionaryEntry {
     pub function: WordFunction,
     pub role: WordRole,
+    pub definition: String,
 }
 
 /// Syllables are always two characters, CV.
@@ -259,6 +263,15 @@ impl PhraseNode {
                 })
                 .next(),
             _ => None,
+        }
+    }
+    pub fn subtitles(&self) -> String {
+        use PhraseNode::*;
+        match self {
+            ClausalPhrase(x) | NounPhrase(x) | VerbPhrase(x) | PositionalPhrase(x) => {
+                x.iter().map(|x| x.subtitles()).join(" ")
+            }
+            Noun(x) | Verb(x) | Position(x) => x.entry.as_ref().unwrap().definition.clone(),
         }
     }
 }

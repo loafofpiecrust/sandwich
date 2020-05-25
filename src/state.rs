@@ -1,13 +1,16 @@
+use crate::display::Render;
 use crate::grammar::*;
 use crate::sandwich::{Ingredient, Sandwich};
 use std::sync::mpsc::Sender;
 
 pub trait State {
+    // TODO Make this `respond(self) -> Box<dyn State>` so we can move data at the end of
+    // a state.
     fn respond(
         &mut self,
         input: &PhraseNode,
         dict: &Dictionary,
-        display: &Sender<Vec<Ingredient>>,
+        display: &Sender<Render>,
     ) -> (String, Option<Sandwich>, Option<Box<dyn State>>);
 }
 
@@ -18,18 +21,18 @@ impl State for Idle {
         &mut self,
         input: &PhraseNode,
         dict: &Dictionary,
-        display: &Sender<Vec<Ingredient>>,
+        display: &Sender<Render>,
     ) -> (String, Option<Sandwich>, Option<Box<dyn State>>) {
         // Only respond if being properly greeted.
         if let Some(WordFunction::Greeting) = input.main_verb().and_then(|v| v.definition()) {
             (
-                dict.first_word_in_class(WordFunction::Greeting).into(),
+                dict.first_word_in_class(WordFunction::Greeting).0.into(),
                 None,
                 Some(Box::new(SandwichOrder::new())),
             )
         } else {
             (
-                dict.first_word_in_class(WordFunction::Negation).into(),
+                dict.first_word_in_class(WordFunction::Negation).0.into(),
                 None,
                 None,
             )
@@ -53,7 +56,7 @@ impl State for SandwichOrder {
         &mut self,
         input: &PhraseNode,
         dict: &Dictionary,
-        display: &Sender<Vec<Ingredient>>,
+        display: &Sender<Render>,
     ) -> (String, Option<Sandwich>, Option<Box<dyn State>>) {
         // TODO Process positional phrases here too somehow.
         match input.main_verb().and_then(|v| v.definition()) {
@@ -64,31 +67,45 @@ impl State for SandwichOrder {
                 {
                     let ingredient = dict.ingredients.from_word(&word.unwrap().word);
                     self.sandwich.ingredients.push(ingredient.clone());
-                    display.send(self.sandwich.ingredients.clone()).unwrap();
-                    return (
-                        dict.first_word_in_class(WordFunction::Affirmation).into(),
-                        None,
-                        None,
-                    );
+                    let (word, entry) = dict.first_word_in_class(WordFunction::Affirmation);
+                    display
+                        .send(Render {
+                            ingredients: self.sandwich.ingredients.clone(),
+                            // TODO Produce English subtitles.
+                            subtitles: entry.definition.clone(),
+                        })
+                        .unwrap();
+                    return (word.into(), None, None);
                 }
             }
             Some(WordFunction::Greeting) => {
                 // Represents showing the sandwich to the client.
                 println!("{:?}", self.sandwich);
-                display.send(self.sandwich.ingredients.clone()).unwrap();
+                let (word, entry) = dict.first_word_in_class(WordFunction::Greeting);
+                display
+                    .send(Render {
+                        ingredients: self.sandwich.ingredients.clone(),
+                        subtitles: entry.definition.clone(),
+                    })
+                    .unwrap();
                 // End the conversation.
                 return (
-                    dict.first_word_in_class(WordFunction::Greeting).into(),
+                    word.into(),
                     Some(self.sandwich.clone()),
                     Some(Box::new(Idle)),
                 );
             }
             _ => (),
         }
-        (
-            dict.first_word_in_class(WordFunction::Negation).into(),
-            None,
-            None,
-        )
+
+        let (word, entry) = dict.first_word_in_class(WordFunction::Negation);
+        display
+            .send(Render {
+                ingredients: self.sandwich.ingredients.clone(),
+                subtitles: entry.definition.clone(),
+            })
+            .unwrap();
+
+        (word.into(), None, None)
     }
 }

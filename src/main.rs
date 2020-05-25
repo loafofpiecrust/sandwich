@@ -11,6 +11,7 @@ use anyhow;
 use async_std::net::TcpStream;
 use async_std::prelude::*;
 use client::Client;
+use display::Render;
 use futures::future::FutureExt;
 use futures::pin_mut;
 use futures::select;
@@ -73,6 +74,11 @@ async fn random_encounter(mut client: Client, mut server: TcpStream) -> anyhow::
     while let Some(line) = client.next_phrase() {
         // play the word out loud.
         audio::play_phrase(&line)?;
+
+        client.display.send(Render {
+            ingredients: Vec::new(),
+            subtitles: client.parse(&line).unwrap().subtitles(),
+        })?;
 
         // Send the other our words.
         let mut buf = [0; 512];
