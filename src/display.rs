@@ -1,11 +1,12 @@
 use crate::sandwich::{Ingredient, Sandwich};
 use piston_window::glyph_cache::rusttype::GlyphCache;
 use piston_window::*;
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::mpsc::{sync_channel, Receiver, Sender, SyncSender};
 use std::thread;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Render {
     pub ingredients: Vec<Ingredient>,
     pub subtitles: String,
@@ -30,29 +31,37 @@ pub fn setup_display<'a>() -> RenderSender {
         let scale = 1.0;
         let offset = 5.0;
         let mut font = window.load_font("assets/OpenSans-Regular.ttf").unwrap();
+        let mut texture_map = HashMap::new();
         let mut textures = Vec::new();
         let mut subtitles = String::new();
         while let Some(e) = window.next() {
-            // Try to receive render updates if there are any.
-            if let Ok(render) = receiver.try_recv() {
-                println!("{:?}", render);
-                // Convert ingredient name to texture of "images/ingredient-name.png"
-                textures = render
-                    .ingredients
-                    .iter()
-                    .map(|x| {
-                        Texture::from_path(
-                            &mut tc,
-                            &format!("images/{}.png", x.name()),
-                            Flip::None,
-                            &TextureSettings::new().filter(Filter::Nearest),
-                        )
-                        .unwrap()
-                    })
-                    .collect();
-                subtitles = render.subtitles;
-            }
             window.draw_2d(&e, |c, g, d| {
+                // Try to receive render updates if there are any.
+                if let Ok(render) = receiver.recv() {
+                    // Convert ingredient name to texture of "images/ingredient-name.png"
+                    textures = render
+                        .ingredients
+                        .iter()
+                        .map(|x| {
+                            texture_map
+                                .entry(x.name().to_owned())
+                                .or_insert_with(|| {
+                                    Texture::from_path(
+                                        &mut tc,
+                                        &format!("images/{}.png", x.name()),
+                                        Flip::None,
+                                        &TextureSettings::new()
+                                            .compress(true)
+                                            .filter(Filter::Nearest),
+                                    )
+                                    .unwrap()
+                                })
+                                .clone()
+                        })
+                        .collect();
+                    subtitles = render.subtitles;
+                }
+
                 clear([0.0, 0.0, 0.0, 1.0], g);
 
                 // Render the subtitles.
