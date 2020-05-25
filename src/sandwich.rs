@@ -8,7 +8,7 @@ use std::fs::File;
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Ingredient {
-    name: String,
+    pub name: String,
     morpheme: String,
     children: Option<Vec<Ingredient>>,
 }

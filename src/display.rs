@@ -22,6 +22,7 @@ pub fn setup_display<'a>() -> RenderSender {
             .fullscreen(true)
             .automatic_close(true)
             .exit_on_esc(true)
+            .vsync(true)
             .build()
             .unwrap();
         let mut tc = TextureContext {
@@ -29,7 +30,7 @@ pub fn setup_display<'a>() -> RenderSender {
             encoder: window.factory.create_command_buffer().into(),
         };
         let scale = 1.0;
-        let offset = 5.0;
+        let offset = 15.0;
         let mut font = window.load_font("assets/OpenSans-Regular.ttf").unwrap();
         let mut texture_map = HashMap::new();
         let mut textures = Vec::new();
@@ -37,18 +38,18 @@ pub fn setup_display<'a>() -> RenderSender {
         while let Some(e) = window.next() {
             window.draw_2d(&e, |c, g, d| {
                 // Try to receive render updates if there are any.
-                if let Ok(render) = receiver.recv() {
+                if let Ok(render) = receiver.try_recv() {
                     // Convert ingredient name to texture of "images/ingredient-name.png"
                     textures = render
                         .ingredients
-                        .iter()
+                        .into_iter()
                         .map(|x| {
                             texture_map
-                                .entry(x.name().to_owned())
+                                .entry(x.name.clone())
                                 .or_insert_with(|| {
                                     Texture::from_path(
                                         &mut tc,
-                                        &format!("images/{}.png", x.name()),
+                                        &format!("images/{}.png", x.name),
                                         Flip::None,
                                         &TextureSettings::new()
                                             .compress(true)
@@ -71,10 +72,7 @@ pub fn setup_display<'a>() -> RenderSender {
                 font.factory.encoder.flush(d);
 
                 // Render all the ingredients as stacked images.
-                let mut curr = c
-                    .transform
-                    .trans(20.0, textures.len() as f64 * offset + 100.0)
-                    .scale(scale, scale);
+                let mut curr = c.transform.trans(20.0, 200.0).scale(scale, scale);
                 for t in &textures {
                     image(t, curr, g);
                     curr = curr.trans(0.0, -offset);
