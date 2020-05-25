@@ -66,13 +66,13 @@ pub fn setup_display<'a>() -> RenderSender {
                 clear([0.0, 0.0, 0.0, 1.0], g);
 
                 // Render the subtitles.
-                let sub_t = c.transform.trans(50.0, 700.0);
+                let sub_t = c.transform.trans(200.0, 800.0);
                 text([1.0, 1.0, 1.0, 1.0], 30, &subtitles, &mut font, sub_t, g).unwrap();
                 // Push all text to the screen.
                 font.factory.encoder.flush(d);
 
                 // Render all the ingredients as stacked images.
-                let mut curr = c.transform.trans(20.0, 200.0).scale(scale, scale);
+                let mut curr = c.transform.trans(400.0, 200.0).scale(scale, scale);
                 for t in &textures {
                     image(t, curr, g);
                     curr = curr.trans(0.0, -offset);
