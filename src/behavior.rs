@@ -43,7 +43,7 @@ impl Behavior for Forgetful {
         if rng.gen_bool(0.1) && !self.forgotten.is_empty() {
             println!("remembering!!");
             Some(self.forgotten.remove(0))
-        } else if pick.is_some() && sandwich.ingredients.len() > curr_idx && rng.gen_bool(0.1) {
+        } else if pick.is_some() && sandwich.ingredients.len() > curr_idx && rng.gen_bool(0.2) {
             println!("forgetting!");
             self.forgotten.push(curr_idx);
             if curr_idx + 1 < sandwich.ingredients.len() {

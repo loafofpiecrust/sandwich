@@ -25,7 +25,8 @@ pub fn setup_display<'a>() -> Sender<Render> {
             factory: window.factory.clone(),
             encoder: window.factory.create_command_buffer().into(),
         };
-        let offset = 1.5;
+        let scale = 1.0;
+        let offset = 20.0 / scale;
         let mut font = window.load_font("assets/OpenSans-Regular.ttf").unwrap();
         let mut textures = Vec::new();
         let mut subtitles = String::new();
@@ -62,7 +63,7 @@ pub fn setup_display<'a>() -> Sender<Render> {
                 let mut curr = c
                     .transform
                     .trans(20.0, textures.len() as f64 * offset + 100.0)
-                    .scale(10.0, 10.0);
+                    .scale(scale, scale);
                 for t in &textures {
                     image(t, curr, g);
                     curr = curr.trans(0.0, -offset);

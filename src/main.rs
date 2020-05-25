@@ -103,7 +103,7 @@ async fn random_encounter(mut client: Client, mut server: TcpStream) -> anyhow::
         println!("{}", response);
         dbg!(sandwich);
 
-        wait_randomly(1000);
+        wait_randomly(800);
     }
 
     // Say goodbye!

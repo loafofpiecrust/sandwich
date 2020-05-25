@@ -34,7 +34,7 @@ impl Client {
         }
     }
     pub fn invent_sandwich(&self) -> Sandwich {
-        Sandwich::random(&self.context.dictionary.ingredients, 5)
+        Sandwich::random(&self.context.dictionary.ingredients, 6)
     }
     pub fn add_behavior(&mut self, b: Box<dyn Behavior>) {
         self.behaviors.push(b);
