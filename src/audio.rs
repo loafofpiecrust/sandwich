@@ -24,7 +24,7 @@ pub fn play_sound(frequencies: (u32, u32), duration: Duration) -> anyhow::Result
 pub fn play_phrase(phrase: &str) -> anyhow::Result<()> {
     for w in phrase.split(" ") {
         play_word(w)?;
-        thread::sleep(Duration::from_millis(100));
+        crate::wait_randomly(100);
     }
     Ok(())
 }

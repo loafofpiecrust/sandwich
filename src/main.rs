@@ -15,6 +15,7 @@ use display::Render;
 use futures::future::FutureExt;
 use futures::pin_mut;
 use futures::select;
+use rand::prelude::*;
 use sandwich::Sandwich;
 use std::thread;
 use std::time::Duration;
@@ -51,6 +52,7 @@ async fn server(mut stream: TcpStream) -> anyhow::Result<()> {
 
         // Then respond with words and maybe a sandwich.
         let (resp, sandwich) = client.respond(&request);
+        wait_randomly(300);
         println!("Responding with {}", resp);
         audio::play_phrase(&resp)?;
 
@@ -62,6 +64,7 @@ async fn server(mut stream: TcpStream) -> anyhow::Result<()> {
         bincode::serialize_into(&mut buf as &mut [u8], &sandwich)?;
         stream.write(&buf).await?;
     }
+    thread::sleep(Duration::from_millis(1000));
 }
 
 async fn random_encounter(mut client: Client, mut server: TcpStream) -> anyhow::Result<()> {
@@ -72,13 +75,13 @@ async fn random_encounter(mut client: Client, mut server: TcpStream) -> anyhow::
 
     // List all the ingredients I want.
     while let Some(line) = client.next_phrase() {
-        // play the word out loud.
-        audio::play_phrase(&line)?;
-
         client.display.send(Render {
             ingredients: Vec::new(),
             subtitles: client.parse(&line).unwrap().subtitles(),
         })?;
+
+        // play the word out loud.
+        audio::play_phrase(&line)?;
 
         // Send the other our words.
         let mut buf = [0; 512];
@@ -100,11 +103,18 @@ async fn random_encounter(mut client: Client, mut server: TcpStream) -> anyhow::
         println!("{}", response);
         dbg!(sandwich);
 
-        thread::sleep(Duration::from_millis(500));
+        wait_randomly(1000);
     }
 
     // Say goodbye!
     client.end_order(&mut server).await?;
 
+    thread::sleep(Duration::from_millis(1000));
+
     Ok(())
+}
+
+pub fn wait_randomly(millis: u64) {
+    let (min, max) = (millis / 2, millis * 2);
+    thread::sleep(Duration::from_millis(thread_rng().gen_range(min, max)));
 }

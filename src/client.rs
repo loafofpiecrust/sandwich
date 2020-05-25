@@ -63,7 +63,7 @@ impl Client {
         Ok(score)
     }
     async fn greet(&self, other: &mut TcpStream) -> anyhow::Result<Option<Sandwich>> {
-        let (hello, _) = self
+        let (hello, hello_def) = self
             .context
             .dictionary
             .first_word_in_class(WordFunction::Greeting);
@@ -85,7 +85,11 @@ impl Client {
         };
 
         println!("{}", resp);
-        audio::play_phrase(&resp)?;
+        self.display.send(Render {
+            ingredients: Vec::new(),
+            subtitles: hello_def.definition.clone(),
+        })?;
+        audio::play_phrase(&hello)?;
         Ok(sandwich)
     }
     pub fn next_phrase(&mut self) -> Option<String> {
