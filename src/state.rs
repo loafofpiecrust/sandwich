@@ -1,4 +1,4 @@
-use crate::display::Render;
+use crate::display::{Render, RenderSender};
 use crate::grammar::*;
 use crate::sandwich::{Ingredient, Sandwich};
 use std::sync::mpsc::Sender;
@@ -10,7 +10,7 @@ pub trait State {
         &mut self,
         input: &PhraseNode,
         dict: &Dictionary,
-        display: &Sender<Render>,
+        display: &RenderSender,
     ) -> (String, Option<Sandwich>, Option<Box<dyn State>>);
 }
 
@@ -21,7 +21,7 @@ impl State for Idle {
         &mut self,
         input: &PhraseNode,
         dict: &Dictionary,
-        display: &Sender<Render>,
+        display: &RenderSender,
     ) -> (String, Option<Sandwich>, Option<Box<dyn State>>) {
         // Only respond if being properly greeted.
         if let Some(WordFunction::Greeting) = input.main_verb().and_then(|v| v.definition()) {
@@ -56,7 +56,7 @@ impl State for SandwichOrder {
         &mut self,
         input: &PhraseNode,
         dict: &Dictionary,
-        display: &Sender<Render>,
+        display: &RenderSender,
     ) -> (String, Option<Sandwich>, Option<Box<dyn State>>) {
         // TODO Process positional phrases here too somehow.
         match input.main_verb().and_then(|v| v.definition()) {

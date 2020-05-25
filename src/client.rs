@@ -1,7 +1,7 @@
 use crate::{
     audio,
     behavior::{Behavior, DesireEncoder, Encoder, PositionedIngredient, RelativeEncoder},
-    display::{setup_display, Render},
+    display::{setup_display, Render, RenderSender},
     grammar,
     grammar::WordFunction,
     sandwich::Sandwich,
@@ -10,7 +10,6 @@ use async_std::net::TcpStream;
 use async_std::prelude::*;
 use bincode;
 use seqalign::{measures::LevenshteinDamerau, Align};
-use std::sync::mpsc::Sender;
 
 pub struct Client {
     pub context: grammar::Context,
@@ -19,7 +18,7 @@ pub struct Client {
     pub sandwich: Option<Sandwich>,
     pub history: Vec<usize>,
     next_index: usize,
-    pub display: Sender<Render>,
+    pub display: RenderSender,
 }
 impl Client {
     pub fn new() -> Self {

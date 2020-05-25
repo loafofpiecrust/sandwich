@@ -2,7 +2,7 @@ use crate::sandwich::{Ingredient, Sandwich};
 use piston_window::glyph_cache::rusttype::GlyphCache;
 use piston_window::*;
 use std::path::Path;
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{sync_channel, Receiver, Sender, SyncSender};
 use std::thread;
 
 #[derive(Debug)]
@@ -11,9 +11,11 @@ pub struct Render {
     pub subtitles: String,
 }
 
+pub type RenderSender = SyncSender<Render>;
+
 // TODO Render both ingredients and subtitles.
-pub fn setup_display<'a>() -> Sender<Render> {
-    let (sender, receiver) = channel::<Render>();
+pub fn setup_display<'a>() -> RenderSender {
+    let (sender, receiver) = sync_channel::<Render>(1);
     thread::spawn(move || {
         let mut window: PistonWindow = WindowSettings::new("SANDWICH", (1920, 1080))
             .fullscreen(true)
@@ -26,13 +28,13 @@ pub fn setup_display<'a>() -> Sender<Render> {
             encoder: window.factory.create_command_buffer().into(),
         };
         let scale = 1.0;
-        let offset = 20.0 / scale;
+        let offset = 5.0;
         let mut font = window.load_font("assets/OpenSans-Regular.ttf").unwrap();
         let mut textures = Vec::new();
         let mut subtitles = String::new();
         while let Some(e) = window.next() {
             // Try to receive render updates if there are any.
-            while let Ok(render) = receiver.try_recv() {
+            if let Ok(render) = receiver.try_recv() {
                 println!("{:?}", render);
                 // Convert ingredient name to texture of "images/ingredient-name.png"
                 textures = render

@@ -1,5 +1,5 @@
 use crate::behavior::Encoder;
-use crate::display::Render;
+use crate::display::{Render, RenderSender};
 use crate::sandwich::{Ingredient, Sandwich};
 use crate::state::{Idle, State};
 use itertools::Itertools;
@@ -69,7 +69,7 @@ impl Context {
         &mut self,
         input: &str,
         encoder: &dyn Encoder,
-        display: &Sender<Render>,
+        display: &RenderSender,
     ) -> (String, Option<Sandwich>) {
         let sentence = self.parse(input, encoder).unwrap();
         let (response, sandwich, next_state) =
