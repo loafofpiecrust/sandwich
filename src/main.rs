@@ -22,18 +22,17 @@ use std::time::Duration;
 
 #[async_std::main]
 async fn main() -> anyhow::Result<()> {
+    let c = Client::new();
     let client = comm::find_peer().fuse();
     let server = comm::wait_for_peer().fuse();
     pin_mut!(client, server);
     select! {
-        s = client => self::client(s?).await,
-        s = server => self::server(s?).await,
+        s = client => self::client(s?, c).await,
+        s = server => self::server(s?, c).await,
     }
 }
 
-async fn client(server: TcpStream) -> anyhow::Result<()> {
-    let mut client = Client::new();
-
+async fn client(server: TcpStream, mut client: Client) -> anyhow::Result<()> {
     println!("{:?}", client.context.dictionary.ingredients.leaves());
 
     client.add_behavior(Box::new(behavior::Forgetful::default()));
@@ -42,8 +41,7 @@ async fn client(server: TcpStream) -> anyhow::Result<()> {
     random_encounter(client, server).await
 }
 
-async fn server(mut stream: TcpStream) -> anyhow::Result<()> {
-    let mut client = Client::new();
+async fn server(mut stream: TcpStream, mut client: Client) -> anyhow::Result<()> {
     loop {
         // Wait for a request,
         let mut buf = [0; 512];
