@@ -199,13 +199,14 @@ impl Encoder for RelativeEncoder {
                 } else {
                     // If we didn't find the referred to ingredient, just add this one to
                     // the end.
-                    return self.inner.decode(phrase, sandwich, lang);
+                    self.inner.decode(phrase, sandwich, lang);
                 }
+                return false;
             }
         }
         // TODO Use the inner decoder??
         // TODO Figure out how to determine finished here?
-        false
+        self.inner.decode(phrase, sandwich, lang)
     }
 }
 
