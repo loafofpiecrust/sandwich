@@ -10,6 +10,7 @@ mod state;
 use anyhow;
 use async_std::net::TcpStream;
 use async_std::prelude::*;
+use behavior::{DesireEncoder, RelativeEncoder};
 use client::Client;
 use display::Render;
 use futures::future::FutureExt;
@@ -33,8 +34,6 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn client(server: TcpStream, mut client: Client) -> anyhow::Result<()> {
-    println!("{:?}", client.context.dictionary.ingredients.leaves());
-
     client.add_behavior(Box::new(behavior::Forgetful::default()));
 
     // First we need to establish communication with a greeting.
@@ -42,6 +41,7 @@ async fn client(server: TcpStream, mut client: Client) -> anyhow::Result<()> {
 }
 
 async fn server(mut stream: TcpStream, mut client: Client) -> anyhow::Result<()> {
+    let mut encoder = RelativeEncoder::new(DesireEncoder);
     loop {
         // Wait for a request,
         let mut buf = [0; 512];
@@ -49,7 +49,7 @@ async fn server(mut stream: TcpStream, mut client: Client) -> anyhow::Result<()>
         let request: String = dbg!(bincode::deserialize(&buf)?);
 
         // Then respond with words and maybe a sandwich.
-        let (resp, sandwich) = client.respond(&request);
+        let (resp, sandwich) = client.respond(&request, &mut encoder);
         wait_randomly(300);
         println!("Responding with {}", resp);
         audio::play_phrase(&resp)?;
@@ -66,16 +66,18 @@ async fn server(mut stream: TcpStream, mut client: Client) -> anyhow::Result<()>
 }
 
 async fn random_encounter(mut client: Client, mut server: TcpStream) -> anyhow::Result<()> {
+    let mut encoder = RelativeEncoder::new(DesireEncoder);
+
     // Initial greeting phase!
     client.start_order(&mut server).await?;
 
     dbg!(&client.sandwich);
 
     // List all the ingredients I want.
-    while let Some(line) = client.next_phrase() {
-        client.display.send(Render {
+    while let Some(line) = client.next_phrase(&mut encoder) {
+        client.lang.display.send(Render {
             ingredients: Vec::new(),
-            subtitles: client.parse(&line).unwrap().subtitles(),
+            subtitles: client.parse(&line, &mut encoder).unwrap().subtitles(),
         })?;
 
         // play the word out loud.

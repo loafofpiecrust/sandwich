@@ -1,7 +1,6 @@
-use crate::display::{Render, RenderSender};
+use crate::display::Render;
 use crate::grammar::*;
-use crate::sandwich::{Ingredient, Sandwich};
-use std::sync::mpsc::Sender;
+use crate::{behavior::Encoder, client::Language, sandwich::Sandwich};
 
 pub trait State {
     // TODO Make this `respond(self) -> Box<dyn State>` so we can move data at the end of
@@ -9,8 +8,8 @@ pub trait State {
     fn respond(
         &mut self,
         input: &PhraseNode,
-        dict: &Dictionary,
-        display: &RenderSender,
+        lang: &Language,
+        encoder: &mut dyn Encoder,
     ) -> (String, Option<Sandwich>, Option<Box<dyn State>>);
 }
 
@@ -20,19 +19,25 @@ impl State for Idle {
     fn respond(
         &mut self,
         input: &PhraseNode,
-        dict: &Dictionary,
-        display: &RenderSender,
+        lang: &Language,
+        _encoder: &mut dyn Encoder,
     ) -> (String, Option<Sandwich>, Option<Box<dyn State>>) {
         // Only respond if being properly greeted.
         if let Some(WordFunction::Greeting) = input.main_verb().and_then(|v| v.definition()) {
             (
-                dict.first_word_in_class(WordFunction::Greeting).0.into(),
+                lang.dictionary
+                    .first_word_in_class(WordFunction::Greeting)
+                    .0
+                    .into(),
                 None,
                 Some(Box::new(SandwichOrder::new())),
             )
         } else {
             (
-                dict.first_word_in_class(WordFunction::Negation).0.into(),
+                lang.dictionary
+                    .first_word_in_class(WordFunction::Negation)
+                    .0
+                    .into(),
                 None,
                 None,
             )
@@ -55,53 +60,28 @@ impl State for SandwichOrder {
     fn respond(
         &mut self,
         input: &PhraseNode,
-        dict: &Dictionary,
-        display: &RenderSender,
+        lang: &Language,
+        encoder: &mut dyn Encoder,
     ) -> (String, Option<Sandwich>, Option<Box<dyn State>>) {
-        // TODO Process positional phrases here too somehow.
-        match input.main_verb().and_then(|v| v.definition()) {
-            Some(WordFunction::Desire) => {
-                let word = input.object();
-                if let Some(WordFunction::Ingredient) =
-                    word.and_then(|o| o.entry.as_ref()).map(|e| e.function)
-                {
-                    let ingredient = dict.ingredients.from_word(&word.unwrap().word);
-                    self.sandwich.ingredients.push(ingredient.clone());
-                    let (word, entry) = dict.first_word_in_class(WordFunction::Affirmation);
-                    display
-                        .send(Render {
-                            ingredients: self.sandwich.ingredients.clone(),
-                            // TODO Produce English subtitles.
-                            subtitles: entry.definition.clone(),
-                        })
-                        .unwrap();
-                    return (word.into(), None, None);
-                }
+        let verb = input
+            .main_verb()
+            .and_then(|x| x.entry.clone())
+            .unwrap()
+            .function;
+        let (word, sammich) = match verb {
+            WordFunction::Greeting => (WordFunction::Greeting, Some(&self.sandwich)),
+            WordFunction::Desire => {
+                encoder.decode(input, &mut self.sandwich, lang);
+                // TODO Say "no" or more if decode fails.
+                (WordFunction::Affirmation, None)
             }
-            Some(WordFunction::Greeting) => {
-                // Represents showing the sandwich to the client.
-                println!("{:?}", self.sandwich);
-                let (word, entry) = dict.first_word_in_class(WordFunction::Greeting);
-                display
-                    .send(Render {
-                        ingredients: self.sandwich.ingredients.clone(),
-                        subtitles: entry.definition.clone(),
-                    })
-                    .unwrap();
-                // End the conversation.
-                return (
-                    word.into(),
-                    Some(self.sandwich.clone()),
-                    Some(Box::new(Idle)),
-                );
-            }
-            _ => (),
-        }
+            _ => (WordFunction::Negation, None),
+        };
 
-        let (word, entry) = dict.first_word_in_class(WordFunction::Negation);
-        display
+        let (word, entry) = lang.dictionary.first_word_in_class(word);
+        lang.display
             .send(Render {
-                ingredients: self.sandwich.ingredients.clone(),
+                ingredients: sammich.map(|s| s.ingredients.clone()).unwrap_or_default(),
                 subtitles: entry.definition.clone(),
             })
             .unwrap();

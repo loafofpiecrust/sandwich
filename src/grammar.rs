@@ -1,19 +1,12 @@
-use crate::behavior::Encoder;
-use crate::display::{Render, RenderSender};
-use crate::sandwich::{Ingredient, Sandwich};
-use crate::state::{Idle, State};
+use crate::{behavior::Encoder, client::Language, sandwich::Ingredient};
 use itertools::Itertools;
-use nom::{
-    branch::*, bytes::complete::*, character::complete::*, combinator::*, multi::*, named, one_of,
-    sequence::*, take_while, ws, IResult, *,
-};
-use serde::{Deserialize, Serialize};
+use nom::{branch::*, bytes::complete::*, combinator::*, multi::*, sequence::*, IResult, *};
+use serde::Deserialize;
 use serde_yaml;
 use std::{
     collections::HashMap,
     fmt::{self, Display, Formatter},
     fs::File,
-    sync::mpsc::Sender,
 };
 
 pub struct Dictionary {
@@ -51,38 +44,13 @@ impl Dictionary {
     }
 }
 
-pub struct Context {
-    /// We'll have a few words with default parts of speech if totally ambiguous.
-    pub dictionary: Dictionary,
-    pub state: Box<dyn State>,
-}
+pub struct Context {}
 impl Default for Context {
     fn default() -> Self {
-        Self {
-            dictionary: Dictionary::new(),
-            state: Box::new(Idle),
-        }
+        Self {}
     }
 }
-impl Context {
-    pub fn respond(
-        &mut self,
-        input: &str,
-        encoder: &dyn Encoder,
-        display: &RenderSender,
-    ) -> (String, Option<Sandwich>) {
-        let sentence = self.parse(input, encoder).unwrap();
-        let (response, sandwich, next_state) =
-            self.state.respond(&sentence, &self.dictionary, display);
-        if let Some(next) = next_state {
-            self.state = next;
-        }
-        (response, sandwich)
-    }
-    pub fn parse(&self, input: &str, encoder: &dyn Encoder) -> Option<PhraseNode> {
-        sentence(input.as_bytes(), self, encoder)
-    }
-}
+impl Context {}
 
 #[derive(PartialEq, Debug, Copy, Clone, Deserialize)]
 pub enum WordFunction {
@@ -193,7 +161,7 @@ pub fn phrase(input: &[u8]) -> IResult<&[u8], Phrase> {
     terminated(separated_list(tag(" "), word), opt(tag("\n")))(input)
 }
 
-pub fn annotate(phrase: &Phrase, context: &Context) -> AnnotatedPhrase {
+pub fn annotate(phrase: &Phrase, context: &Language) -> AnnotatedPhrase {
     let mut result = AnnotatedPhrase::new();
     for word in phrase {
         let word_str = format!("{}", word);
@@ -208,9 +176,9 @@ pub fn annotate(phrase: &Phrase, context: &Context) -> AnnotatedPhrase {
     result
 }
 
-pub fn sentence(input: &[u8], context: &Context, encoder: &dyn Encoder) -> Option<PhraseNode> {
+pub fn sentence(input: &[u8], lang: &Language, encoder: &dyn Encoder) -> Option<PhraseNode> {
     if let Ok((_, parsed)) = phrase(input) {
-        let tagged = annotate(&parsed, context);
+        let tagged = annotate(&parsed, lang);
         std::dbg!(&tagged);
         if let Ok((_, tree)) = clause(&tagged, encoder) {
             Some(tree)
@@ -241,6 +209,35 @@ impl PhraseNode {
             NounPhrase(x) | VerbPhrase(x) | ClausalPhrase(x) | PositionalPhrase(x) => {
                 x.iter().filter_map(|x| x.main_verb()).next()
             }
+            _ => None,
+        }
+    }
+    pub fn main_verb_phrase(&self) -> Option<&PhraseNode> {
+        use PhraseNode::*;
+        match self {
+            VerbPhrase(_) => Some(self),
+            NounPhrase(x) | ClausalPhrase(x) | PositionalPhrase(x) => {
+                x.iter().filter_map(|x| x.main_verb_phrase()).next()
+            }
+            _ => None,
+        }
+    }
+    pub fn object_phrase(&self) -> Option<&PhraseNode> {
+        use PhraseNode::*;
+        match self {
+            NounPhrase(_) | PositionalPhrase(_) => Some(self),
+            VerbPhrase(x) => x.iter().filter_map(|x| x.object_phrase()).next(),
+            ClausalPhrase(x) => x
+                .iter()
+                .filter_map(|x| {
+                    // Objects only come from the verb phrase, subjects sit outside.
+                    if let VerbPhrase(_) = x {
+                        x.object_phrase()
+                    } else {
+                        None
+                    }
+                })
+                .next(),
             _ => None,
         }
     }
@@ -332,5 +329,3 @@ pub fn clause<'a>(
         ),
     ))(input)
 }
-
-struct Parsers {}

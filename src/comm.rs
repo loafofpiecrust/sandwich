@@ -29,12 +29,7 @@ pub async fn find_peer() -> std::io::Result<TcpStream> {
 
 pub async fn wait_for_peer() -> std::io::Result<TcpStream> {
     let conn = TcpListener::bind(format!("0.0.0.0:{}", SANDWICH_PORT)).await?;
-    let (mut stream, addr) = conn.accept().await?;
+    let (stream, _addr) = conn.accept().await?;
     println!("Client connected!!");
-    config_stream(&mut stream).await?;
     Ok(stream)
-}
-
-async fn config_stream(s: &mut TcpStream) -> std::io::Result<()> {
-    Ok(())
 }

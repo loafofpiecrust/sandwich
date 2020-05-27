@@ -1,9 +1,7 @@
-use crate::sandwich::{Ingredient, Sandwich};
-use piston_window::glyph_cache::rusttype::GlyphCache;
+use crate::sandwich::Ingredient;
 use piston_window::*;
 use std::collections::HashMap;
-use std::path::Path;
-use std::sync::mpsc::{sync_channel, Receiver, Sender, SyncSender};
+use std::sync::mpsc::{sync_channel, SyncSender};
 use std::thread;
 
 #[derive(Debug, Default)]

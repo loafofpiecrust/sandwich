@@ -1,39 +1,68 @@
 use crate::{
     audio,
-    behavior::{Behavior, DesireEncoder, Encoder, PositionedIngredient, RelativeEncoder},
+    behavior::{Behavior, Encoder, PositionedIngredient},
     display::{setup_display, Render, RenderSender},
     grammar,
     grammar::WordFunction,
     sandwich::Sandwich,
+    state::{Idle, State},
 };
 use async_std::net::TcpStream;
 use async_std::prelude::*;
 use bincode;
+use grammar::{sentence, Dictionary, PhraseNode};
 use seqalign::{measures::LevenshteinDamerau, Align};
 
+pub struct Language {
+    pub dictionary: Dictionary,
+    pub display: RenderSender,
+}
+impl Language {
+    fn new() -> Self {
+        Self {
+            dictionary: Dictionary::new(),
+            display: setup_display(),
+        }
+    }
+}
+
 pub struct Client {
-    pub context: grammar::Context,
+    /// We'll have a few words with default parts of speech if totally ambiguous.
+    pub state: Box<dyn State>,
     behaviors: Vec<Box<dyn Behavior>>,
-    encoder: Box<dyn Encoder>,
     pub sandwich: Option<Sandwich>,
     pub history: Vec<usize>,
     next_index: usize,
-    pub display: RenderSender,
+    pub lang: Language,
 }
 impl Client {
     pub fn new() -> Self {
         Self {
-            context: Default::default(),
+            state: Box::new(Idle),
             behaviors: Vec::new(),
             history: Vec::new(),
-            encoder: Box::new(RelativeEncoder::new(DesireEncoder)),
             sandwich: None,
             next_index: 0,
-            display: setup_display(),
+            lang: Language::new(),
         }
     }
+    pub fn respond(
+        &mut self,
+        input: &str,
+        encoder: &mut dyn Encoder,
+    ) -> (String, Option<Sandwich>) {
+        let sentence = self.parse(input, encoder).unwrap();
+        let (response, sandwich, next_state) = self.state.respond(&sentence, &self.lang, encoder);
+        if let Some(next) = next_state {
+            self.state = next;
+        }
+        (response, sandwich)
+    }
+    pub fn parse(&self, input: &str, encoder: &mut dyn Encoder) -> Option<PhraseNode> {
+        sentence(input.as_bytes(), &self.lang, encoder)
+    }
     pub fn invent_sandwich(&self) -> Sandwich {
-        Sandwich::random(&self.context.dictionary.ingredients, 6)
+        Sandwich::random(&self.lang.dictionary.ingredients, 6)
     }
     pub fn add_behavior(&mut self, b: Box<dyn Behavior>) {
         self.behaviors.push(b);
@@ -63,7 +92,7 @@ impl Client {
     }
     async fn greet(&self, other: &mut TcpStream) -> anyhow::Result<Option<Sandwich>> {
         let (hello, hello_def) = self
-            .context
+            .lang
             .dictionary
             .first_word_in_class(WordFunction::Greeting);
         // Send the phrase over...
@@ -84,14 +113,14 @@ impl Client {
         };
 
         println!("{}", resp);
-        self.display.send(Render {
+        self.lang.display.send(Render {
             ingredients: Vec::new(),
             subtitles: hello_def.definition.clone(),
         })?;
         audio::play_phrase(&hello)?;
         Ok(sandwich)
     }
-    pub fn next_phrase(&mut self) -> Option<String> {
+    pub fn next_phrase(&mut self, encoder: &mut dyn Encoder) -> Option<String> {
         let sandwich = self.sandwich.as_ref().unwrap();
 
         let mut next_ingredient = Some(self.next_index);
@@ -104,8 +133,8 @@ impl Client {
             if idx >= sandwich.ingredients.len() {
                 return None;
             }
-            let result = Some(self.encoder.encode(
-                &self.context,
+            let result = Some(encoder.encode(
+                &self.lang,
                 PositionedIngredient {
                     sandwich,
                     index: idx,
@@ -133,12 +162,5 @@ impl Client {
         } else {
             0.0
         }
-    }
-
-    pub fn respond(&mut self, prompt: &str) -> (String, Option<Sandwich>) {
-        self.context.respond(prompt, &*self.encoder, &self.display)
-    }
-    pub fn parse(&self, prompt: &str) -> Option<grammar::PhraseNode> {
-        self.context.parse(prompt, &*self.encoder)
     }
 }

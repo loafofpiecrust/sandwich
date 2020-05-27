@@ -2,7 +2,7 @@ use crate::grammar;
 use anyhow;
 use itertools::Itertools;
 use rodio::{self, Sink};
-use std::{f32, thread, time::Duration};
+use std::{thread, time::Duration};
 
 pub fn play_sound(frequencies: (u32, u32), duration: Duration) -> anyhow::Result<()> {
     let device = rodio::default_output_device().unwrap();
