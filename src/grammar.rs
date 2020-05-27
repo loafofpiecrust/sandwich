@@ -179,8 +179,8 @@ pub fn annotate(phrase: &Phrase, context: &Language) -> AnnotatedPhrase {
 pub fn sentence(input: &[u8], lang: &Language, encoder: &dyn Encoder) -> Option<PhraseNode> {
     if let Ok((_, parsed)) = phrase(input) {
         let tagged = annotate(&parsed, lang);
-        std::dbg!(&tagged);
         if let Ok((_, tree)) = clause(&tagged, encoder) {
+            std::dbg!(&tree);
             Some(tree)
         } else {
             None

@@ -37,7 +37,7 @@ impl Behavior for Forgetful {
         if rng.gen_bool(0.2) && !self.forgotten.is_empty() {
             println!("remembering!!");
             Some(self.forgotten.remove(0))
-        } else if pick.is_some() && sandwich.ingredients.len() > curr_idx && rng.gen_bool(0.1) {
+        } else if pick.is_some() && sandwich.ingredients.len() > curr_idx && rng.gen_bool(0.3) {
             println!("forgetting!");
             self.forgotten.push(curr_idx);
             if curr_idx + 1 < sandwich.ingredients.len() {
@@ -129,11 +129,19 @@ impl Encoder for RelativeEncoder {
         let last_order = *item.history.last().unwrap_or(&0);
         println!("Encoding relative maybe? {:?}", item);
         if item.index != last_order && item.index != last_order + 1 && item.index > 0 {
-            let previous = &item.sandwich.ingredients[item.index - 1];
+            // We want this ingredient after the closest one before it that we already
+            // asked for.
+            let previous = item
+                .history
+                .iter()
+                .filter(|x| **x < item.index)
+                .max()
+                .map(|x| *x)
+                .unwrap_or(item.history.len() - 1);
             let prev_word = context
                 .dictionary
                 .ingredients
-                .to_word(&previous, String::new())
+                .to_word(&item.sandwich.ingredients[previous], String::new())
                 .unwrap();
             let (prep, _) = context.dictionary.first_word_in_class(WordFunction::After);
             // Syntax is: V'[PP[NP P] V'...]
@@ -141,15 +149,15 @@ impl Encoder for RelativeEncoder {
                 // TODO Allow the head/inner to switch sides!
                 HeadSide::Pre => format!(
                     "{} {} {}",
+                    self.inner.encode(context, item),
                     prep,
                     prev_word,
-                    self.inner.encode(context, item)
                 ),
                 HeadSide::Post => format!(
                     "{} {} {}",
                     prev_word,
                     prep,
-                    self.inner.encode(context, item)
+                    self.inner.encode(context, item),
                 ),
             }
         } else {
