@@ -69,7 +69,7 @@ impl State for SandwichOrder {
             .unwrap()
             .function;
         let (word, sammich) = match verb {
-            WordFunction::Greeting => (WordFunction::Greeting, Some(&self.sandwich)),
+            WordFunction::Greeting => (WordFunction::Greeting, Some(self.sandwich.clone())),
             WordFunction::Desire => {
                 encoder.decode(input, &mut self.sandwich, lang);
                 // TODO Say "no" or more if decode fails.
@@ -81,11 +81,11 @@ impl State for SandwichOrder {
         let (word, entry) = lang.dictionary.first_word_in_class(word);
         lang.display
             .send(Render {
-                ingredients: sammich.map(|s| s.ingredients.clone()).unwrap_or_default(),
+                ingredients: self.sandwich.ingredients.clone(),
                 subtitles: entry.definition.clone(),
             })
             .unwrap();
 
-        (word.into(), None, None)
+        (word.into(), sammich, None)
     }
 }
