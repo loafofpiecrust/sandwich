@@ -25,7 +25,17 @@ pub trait Behavior {
 
 #[derive(Clone, Default)]
 pub struct Forgetful {
+    /// How forgetful this machine is.
+    degree: f64,
     forgotten: Vec<usize>,
+}
+impl Forgetful {
+    pub fn new(degree: f64) -> Self {
+        Self {
+            degree,
+            ..Default::default()
+        }
+    }
 }
 impl Behavior for Forgetful {
     fn start(&self) {}
@@ -34,10 +44,13 @@ impl Behavior for Forgetful {
         let mut rng = thread_rng();
         let curr_idx = pick.unwrap_or(0);
         // TODO Chance to remember a forgotten ingredient.
-        if rng.gen_bool(0.2) && !self.forgotten.is_empty() {
+        if rng.gen_bool(self.degree * 0.5) && !self.forgotten.is_empty() {
             println!("remembering!!");
             Some(self.forgotten.remove(0))
-        } else if pick.is_some() && sandwich.ingredients.len() > curr_idx && rng.gen_bool(0.3) {
+        } else if pick.is_some()
+            && sandwich.ingredients.len() > curr_idx
+            && rng.gen_bool(self.degree)
+        {
             println!("forgetting!");
             self.forgotten.push(curr_idx);
             if curr_idx + 1 < sandwich.ingredients.len() {

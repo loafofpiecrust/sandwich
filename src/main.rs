@@ -34,7 +34,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn client(server: TcpStream, mut client: Client) -> anyhow::Result<()> {
-    client.add_behavior(Box::new(behavior::Forgetful::default()));
+    client.add_behavior(behavior::Forgetful::new(0.3));
 
     // First we need to establish communication with a greeting.
     random_encounter(client, server).await

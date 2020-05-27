@@ -64,8 +64,8 @@ impl Client {
     pub fn invent_sandwich(&self) -> Sandwich {
         Sandwich::random(&self.lang.dictionary.ingredients, 6)
     }
-    pub fn add_behavior(&mut self, b: Box<dyn Behavior>) {
-        self.behaviors.push(b);
+    pub fn add_behavior(&mut self, b: impl Behavior + 'static) {
+        self.behaviors.push(Box::new(b));
     }
     pub async fn start_order(&mut self, other: &mut TcpStream) -> anyhow::Result<()> {
         let sammich = self.invent_sandwich();
