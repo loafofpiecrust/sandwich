@@ -16,13 +16,13 @@ pub type RenderSender = SyncSender<Render>;
 pub fn setup_display<'a>() -> RenderSender {
     let (sender, receiver) = sync_channel::<Render>(1);
     thread::spawn(move || {
-        let mut window: PistonWindow = WindowSettings::new("SANDWICH", (1920, 1080))
+        let mut window = WindowSettings::new("SANDWICH", (1920, 1080))
             .fullscreen(true)
             .automatic_close(true)
             .exit_on_esc(true)
             .vsync(true)
-            .build();
-        if let Ok(window) = window {
+            .build::<PistonWindow>();
+        if let Ok(mut window) = window {
             let mut tc = TextureContext {
                 factory: window.factory.clone(),
                 encoder: window.factory.create_command_buffer().into(),
