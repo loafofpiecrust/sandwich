@@ -23,6 +23,9 @@ pub trait Behavior {
     fn next_ingredient(&mut self, sandwich: &Sandwich, pick: Option<usize>) -> Option<usize>;
 }
 
+const MAX_ACCURACY: f64 = 1.0;
+const MIN_ACCURACY: f64 = 0.1;
+
 #[derive(Clone, Default)]
 pub struct Forgetful {
     /// How forgetful this machine is.
@@ -127,13 +130,30 @@ pub enum HeadSide {
 
 pub struct RelativeEncoder {
     inner: Box<dyn Encoder>,
-    side: HeadSide,
+    side_bias: f64,
+    accuracy: f64,
 }
 impl RelativeEncoder {
-    pub fn new(inner: impl Encoder + 'static) -> Self {
+    pub fn new(accuracy: f64, inner: impl Encoder + 'static) -> Self {
         Self {
             inner: Box::new(inner),
-            side: HeadSide::Post,
+            side_bias: 0.5,
+            accuracy,
+        }
+    }
+    fn pick_side(&mut self) -> HeadSide {
+        let mut rng = thread_rng();
+        let change = rng.gen_range(0.05, 0.15);
+        if rng.gen_bool(self.side_bias) {
+            if self.side_bias < 1.0 {
+                self.side_bias += change;
+            }
+            HeadSide::Pre
+        } else {
+            if self.side_bias > 0.0 {
+                self.side_bias -= change;
+            }
+            HeadSide::Post
         }
     }
 }
@@ -158,7 +178,7 @@ impl Encoder for RelativeEncoder {
                 .unwrap();
             let (prep, _) = context.dictionary.first_word_in_class(WordFunction::After);
             // Syntax is: V'[PP[NP P] V'...]
-            match &self.side {
+            match self.pick_side() {
                 // TODO Allow the head/inner to switch sides!
                 HeadSide::Pre => format!(
                     "{} {} {}",
@@ -196,37 +216,46 @@ impl Encoder for RelativeEncoder {
     // TODO Make a DecodeError or DecodeResult type to represent either Completed,
     // Success, or Failure.
     fn decode(&mut self, phrase: &PhraseNode, sandwich: &mut Sandwich, lang: &Language) -> bool {
-        // look for a prepositional phrase in the object of the main verb.
-        if let Some(PhraseNode::PositionalPhrase(parts)) = phrase.object_phrase() {
-            if let [np1, p, np2] = &parts[..] {
-                let (existing_np, new_np) = match &self.side {
-                    HeadSide::Pre => (np2, np1),
-                    HeadSide::Post => (np1, np2),
-                };
-                // The ingredient presumably already in the sandwich
-                let existing = lang
-                    .dictionary
-                    .ingredients
-                    .from_word(&existing_np.object().unwrap().word);
-                let new = lang
-                    .dictionary
-                    .ingredients
-                    .from_word(&new_np.object().unwrap().word);
-                // Index of the existing ingredient.
-                let idx = sandwich.ingredients.iter().position(|x| x == existing);
-                if let Some(idx) = idx {
-                    // TODO Consider which type of position it is. For now assuming "after".
-                    sandwich.ingredients.insert(idx + 1, new.clone());
-                } else {
-                    // If we didn't find the referred to ingredient, just add this one to
-                    // the end.
-                    self.inner.decode(phrase, sandwich, lang);
+        // Even if we successfully parse a positional phrase,
+        // there's a chance we miss it.
+        if thread_rng().gen_bool(self.accuracy) {
+            // look for a prepositional phrase in the object of the main verb.
+            if let Some(PhraseNode::PositionalPhrase(parts)) = phrase.object_phrase() {
+                if let [np1, p, np2] = &parts[..] {
+                    // TODO Use successfulness to change bias rather than just by random.
+                    let (existing_np, new_np) = match self.pick_side() {
+                        HeadSide::Pre => (np2, np1),
+                        HeadSide::Post => (np1, np2),
+                    };
+                    // The ingredient presumably already in the sandwich
+                    let existing = lang
+                        .dictionary
+                        .ingredients
+                        .from_word(&existing_np.object().unwrap().word);
+                    let new = lang
+                        .dictionary
+                        .ingredients
+                        .from_word(&new_np.object().unwrap().word);
+                    // Index of the existing ingredient.
+                    let idx = sandwich.ingredients.iter().position(|x| x == existing);
+                    if let Some(idx) = idx {
+                        // TODO Consider which type of position it is. For now assuming "after".
+                        sandwich.ingredients.insert(idx + 1, new.clone());
+                        // We successfully used a positional phrase, so up our accuracy!
+                        if self.accuracy < MAX_ACCURACY {
+                            self.accuracy += 0.1;
+                        }
+                        return false;
+                    }
                 }
-                return false;
+            } else
+            // If we never see positions, slowly forget about them.
+            if self.accuracy > MIN_ACCURACY {
+                self.accuracy -= 0.001;
             }
         }
-        // TODO Use the inner decoder??
-        // TODO Figure out how to determine finished here?
+        // If we didn't find the referred to ingredient, just add this one to
+        // the end.
         self.inner.decode(phrase, sandwich, lang)
     }
 }

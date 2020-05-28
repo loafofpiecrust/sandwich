@@ -41,7 +41,7 @@ async fn client(server: TcpStream, mut client: Client) -> anyhow::Result<()> {
 }
 
 async fn server(mut stream: TcpStream, mut client: Client) -> anyhow::Result<()> {
-    let mut encoder = RelativeEncoder::new(DesireEncoder);
+    let mut encoder = RelativeEncoder::new(0.8, DesireEncoder);
     loop {
         // Wait for a request,
         let mut buf = [0; 512];
@@ -66,7 +66,7 @@ async fn server(mut stream: TcpStream, mut client: Client) -> anyhow::Result<()>
 }
 
 async fn random_encounter(mut client: Client, mut server: TcpStream) -> anyhow::Result<()> {
-    let mut encoder = RelativeEncoder::new(DesireEncoder);
+    let mut encoder = RelativeEncoder::new(0.8, DesireEncoder);
 
     // Initial greeting phase!
     client.start_order(&mut server).await?;

@@ -161,16 +161,16 @@ pub fn phrase(input: &[u8]) -> IResult<&[u8], Phrase> {
     terminated(separated_list(tag(" "), word), opt(tag("\n")))(input)
 }
 
-pub fn annotate(phrase: &Phrase, context: &Language) -> AnnotatedPhrase {
+pub fn annotate(phrase: Phrase, context: &Language) -> AnnotatedPhrase {
     let mut result = AnnotatedPhrase::new();
     for word in phrase {
-        let word_str = format!("{}", word);
-        let entry = context.dictionary.get(&word_str).map(|x| x.clone());
+        let word_str = word.to_string();
+        let entry = context.dictionary.get(&word_str);
         result.push(AnnotatedWord {
-            word: word.clone(),
+            word,
             // TODO: Use syntactic context for word role.
-            role: entry.clone().map(|e| e.clone().role),
-            entry,
+            role: entry.map(|e| e.role.clone()),
+            entry: entry.cloned(),
         });
     }
     result
@@ -178,12 +178,18 @@ pub fn annotate(phrase: &Phrase, context: &Language) -> AnnotatedPhrase {
 
 pub fn sentence(input: &[u8], lang: &Language, encoder: &dyn Encoder) -> Option<PhraseNode> {
     if let Ok((_, parsed)) = phrase(input) {
-        let tagged = annotate(&parsed, lang);
+        let tagged = annotate(parsed, lang);
         if let Ok((_, tree)) = clause(&tagged, encoder) {
             std::dbg!(&tree);
             Some(tree)
         } else {
-            None
+            // Try again with unknown words removed.
+            let nt = tagged
+                .into_iter()
+                .filter(|x| x.role.is_some() || x.entry.is_some())
+                .collect_vec();
+            let c = clause(&nt, encoder);
+            c.ok().map(|(_, t)| t)
         }
     } else {
         None
