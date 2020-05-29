@@ -80,7 +80,7 @@ pub fn setup_display<'a>() -> RenderSender {
         } else {
             // Dummy receiver if we can't do visuals.
             loop {
-                receiver.recv();
+                receiver.recv().unwrap();
             }
         }
     });
