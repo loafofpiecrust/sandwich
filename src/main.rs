@@ -5,6 +5,7 @@ mod comm;
 mod display;
 mod grammar;
 mod sandwich;
+mod sawtooth;
 mod state;
 
 use anyhow;

@@ -1,4 +1,5 @@
 use crate::grammar;
+use crate::sawtooth::SawtoothWave;
 use anyhow;
 use itertools::Itertools;
 use rodio::{self, Sink};
@@ -10,7 +11,7 @@ pub fn play_sound(frequencies: (u32, u32), duration: Duration) -> anyhow::Result
     let sink2 = Sink::new(&device);
 
     // Play two sine waves at once for dual-tone effect.
-    sink1.append(rodio::source::SineWave::new(frequencies.0));
+    sink1.append(SawtoothWave::new(frequencies.0));
     sink2.append(rodio::source::SineWave::new(frequencies.1));
 
     thread::sleep(duration);
@@ -24,7 +25,7 @@ pub fn play_sound(frequencies: (u32, u32), duration: Duration) -> anyhow::Result
 pub fn play_phrase(phrase: &str) -> anyhow::Result<()> {
     for w in phrase.split(" ") {
         play_word(w)?;
-        crate::wait_randomly(100);
+        // crate::wait_randomly(100);
     }
     Ok(())
 }
