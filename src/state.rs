@@ -1,6 +1,10 @@
 use crate::display::Render;
 use crate::grammar::*;
-use crate::{behavior::Encoder, client::Language, sandwich::Sandwich};
+use crate::{
+    behavior::Encoder,
+    client::Language,
+    sandwich::{Ingredient, Sandwich},
+};
 
 pub trait State {
     // TODO Make this `respond(self) -> Box<dyn State>` so we can move data at the end of
@@ -87,5 +91,16 @@ impl State for SandwichOrder {
             .unwrap();
 
         (word.into(), sammich, None)
+    }
+}
+
+pub struct OrderingSandwich {
+    sandwich: Sandwich,
+}
+impl OrderingSandwich {
+    fn new(all_ingredients: &Ingredient) -> Self {
+        Self {
+            sandwich: Sandwich::random(all_ingredients, 5),
+        }
     }
 }

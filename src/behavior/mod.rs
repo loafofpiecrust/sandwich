@@ -1,9 +1,14 @@
+mod allergy;
+
+// Re-export everything from behavior submodules.
+pub use allergy::*;
+
 use crate::{
     client::Language,
     grammar::{self, AnnotatedWord, PhraseNode, WordFunction, WordRole},
     sandwich::Sandwich,
 };
-use nom::{branch::*, combinator::*, sequence::*, IResult, *};
+use nom::{branch::*, combinator::*, sequence::*, IResult};
 use rand;
 use rand::prelude::*;
 

@@ -1,17 +1,21 @@
 use crate::{
     audio,
-    behavior::{Behavior, Encoder, PositionedIngredient},
+    behavior::{Behavior, DesireEncoder, Encoder, PositionedIngredient, RelativeEncoder},
+    comm,
     display::{setup_display, Render, RenderSender},
     grammar,
     grammar::WordFunction,
     sandwich::Sandwich,
     state::{Idle, State},
+    wait_randomly,
 };
 use async_std::net::TcpStream;
 use async_std::prelude::*;
 use bincode;
+use futures::{pin_mut, select, FutureExt};
 use grammar::{sentence, Dictionary, PhraseNode};
 use seqalign::{measures::LevenshteinDamerau, Align};
+use std::{thread, time::Duration};
 
 pub struct Language {
     pub dictionary: Dictionary,
@@ -24,6 +28,9 @@ impl Language {
             display: setup_display(),
         }
     }
+    pub fn render(&self, state: Render) -> anyhow::Result<()> {
+        Ok(self.display.send(state)?)
+    }
 }
 
 pub struct Client {
@@ -34,6 +41,7 @@ pub struct Client {
     pub history: Vec<usize>,
     next_index: usize,
     pub lang: Language,
+    encoder: Box<dyn Encoder>,
 }
 impl Client {
     pub fn new() -> Self {
@@ -44,22 +52,113 @@ impl Client {
             sandwich: None,
             next_index: 0,
             lang: Language::new(),
+            encoder: Box::new(RelativeEncoder::new(0.8, DesireEncoder)),
         }
     }
-    pub fn respond(
-        &mut self,
-        input: &str,
-        encoder: &mut dyn Encoder,
-    ) -> (String, Option<Sandwich>) {
-        let sentence = self.parse(input, encoder).unwrap();
-        let (response, sandwich, next_state) = self.state.respond(&sentence, &self.lang, encoder);
+
+    pub async fn connect_with_peer(&mut self) -> anyhow::Result<()> {
+        let client = comm::find_peer().fuse();
+        let server = comm::wait_for_peer().fuse();
+        pin_mut!(client, server);
+        select! {
+            s = client => self.client(s?).await,
+            s = server => self.server(s?).await,
+        }
+    }
+
+    async fn server(&mut self, mut stream: TcpStream) -> anyhow::Result<()> {
+        loop {
+            // Wait for a request,
+            let mut buf = [0; 512];
+            stream.read(&mut buf).await?;
+            let request: String = dbg!(bincode::deserialize(&buf)?);
+
+            // Then respond with words and maybe a sandwich.
+            let (resp, sandwich) = self.respond(&request);
+            println!("Responding with {}", resp);
+            self.say_phrase(&resp, sandwich, &mut stream).await?;
+        }
+    }
+
+    async fn client(&mut self, mut server: TcpStream) -> anyhow::Result<()> {
+        // Initial greeting phase!
+        self.start_order(&mut server).await?;
+
+        dbg!(&self.sandwich);
+
+        // List all the ingredients I want.
+        while let Some(line) = self.next_phrase() {
+            self.say_phrase(&line, None, &mut server).await?;
+
+            // Wait for a response.
+            let response: String = {
+                let mut buffer = [0; 512];
+                server.read(&mut buffer).await?;
+                bincode::deserialize(&buffer)?
+            };
+            let sandwich: Option<Sandwich> = {
+                let mut buffer = [0; 512];
+                server.read(&mut buffer).await?;
+                bincode::deserialize(&buffer)?
+            };
+
+            println!("{}", response);
+            dbg!(sandwich);
+
+            wait_randomly(800);
+        }
+
+        // Say goodbye!
+        self.end_order(&mut server).await?;
+
+        thread::sleep(Duration::from_millis(1000));
+
+        Ok(())
+    }
+
+    /// Say the given phrase out loud, display the given sandwich, and send both to
+    /// another machine with the given stream.
+    async fn say_phrase(
+        &self,
+        phrase: &str,
+        sandwich: Option<Sandwich>,
+        stream: &mut TcpStream,
+    ) -> anyhow::Result<()> {
+        let mut buf = [0; 512];
+        bincode::serialize_into(&mut buf as &mut [u8], &sandwich)?;
+
+        // Convert phrase to subtitles!
+        self.lang.render(Render {
+            ingredients: sandwich.map(|x| x.ingredients).unwrap_or_default(),
+            subtitles: self.parse(phrase).unwrap().subtitles(),
+        })?;
+
+        // Play the phrase out loud.
+        audio::play_phrase(phrase)?;
+
+        // Send the other our words.
+        let mut str_buf = [0; 512];
+        bincode::serialize_into(&mut str_buf as &mut [u8], &phrase)?;
+        stream.write(&str_buf).await?;
+
+        // Send the sandwich.
+        stream.write(&buf).await?;
+
+        Ok(())
+    }
+
+    pub fn respond(&mut self, input: &str) -> (String, Option<Sandwich>) {
+        let sentence = self.parse(input).unwrap();
+        let (response, sandwich, next_state) =
+            self.state
+                .respond(&sentence, &self.lang, &mut *self.encoder);
         if let Some(next) = next_state {
             self.state = next;
         }
         (response, sandwich)
     }
-    pub fn parse(&self, input: &str, encoder: &mut dyn Encoder) -> Option<PhraseNode> {
-        sentence(input.as_bytes(), &self.lang, encoder)
+    pub fn parse(&self, input: &str) -> Option<PhraseNode> {
+        sentence(input.as_bytes(), &self.lang, &*self.encoder)
     }
     pub fn invent_sandwich(&self) -> Sandwich {
         Sandwich::random(&self.lang.dictionary.ingredients, 6)
@@ -67,7 +166,7 @@ impl Client {
     pub fn add_behavior(&mut self, b: impl Behavior + 'static) {
         self.behaviors.push(Box::new(b));
     }
-    pub async fn start_order(&mut self, other: &mut TcpStream) -> anyhow::Result<()> {
+    async fn start_order(&mut self, other: &mut TcpStream) -> anyhow::Result<()> {
         let sammich = self.invent_sandwich();
         self.next_index = 0;
         self.sandwich = Some(sammich);
@@ -77,7 +176,7 @@ impl Client {
         }
         Ok(())
     }
-    pub async fn end_order(&mut self, other: &mut TcpStream) -> anyhow::Result<f64> {
+    async fn end_order(&mut self, other: &mut TcpStream) -> anyhow::Result<f64> {
         for b in &self.behaviors {
             b.end();
         }
@@ -91,36 +190,29 @@ impl Client {
         Ok(score)
     }
     async fn greet(&self, other: &mut TcpStream) -> anyhow::Result<Option<Sandwich>> {
-        let (hello, hello_def) = self
+        let (hello, _) = self
             .lang
             .dictionary
             .first_word_in_class(WordFunction::Greeting);
-        // Send the phrase over...
-        let mut buf = [0; 512];
-        bincode::serialize_into(&mut buf as &mut [u8], &hello)?;
-        other.write(&buf).await?;
+
+        self.say_phrase(hello, None, other).await?;
 
         // And wait for a response!
         let resp: String = {
-            buf = [0; 512];
+            let mut buf = [0; 512];
             other.read(&mut buf).await?;
             bincode::deserialize(&buf).unwrap()
         };
         let sandwich: Option<Sandwich> = {
-            buf = [0; 512];
+            let mut buf = [0; 512];
             other.read(&mut buf).await?;
             bincode::deserialize(&buf).unwrap()
         };
 
         println!("{}", resp);
-        self.lang.display.send(Render {
-            ingredients: Vec::new(),
-            subtitles: hello_def.definition.clone(),
-        })?;
-        audio::play_phrase(&hello)?;
         Ok(sandwich)
     }
-    pub fn next_phrase(&mut self, encoder: &mut dyn Encoder) -> Option<String> {
+    pub fn next_phrase(&mut self) -> Option<String> {
         let sandwich = self.sandwich.as_ref().unwrap();
 
         let mut next_ingredient = Some(self.next_index);
@@ -133,7 +225,7 @@ impl Client {
             if idx >= sandwich.ingredients.len() {
                 return None;
             }
-            let result = Some(encoder.encode(
+            let result = Some(self.encoder.encode(
                 &self.lang,
                 PositionedIngredient {
                     sandwich,
