@@ -1,7 +1,7 @@
 use crate::display::Render;
 use crate::grammar::*;
 use crate::{
-    behavior::Encoder,
+    behavior::{Behavior, Behaviors, Encoder, PositionedIngredient},
     client::Language,
     sandwich::{Ingredient, Sandwich},
 };
@@ -14,7 +14,8 @@ pub trait State {
         input: &PhraseNode,
         lang: &Language,
         encoder: &mut dyn Encoder,
-    ) -> (String, Option<Sandwich>, Option<Box<dyn State>>);
+        behavior: &mut Behaviors,
+    ) -> (Option<String>, Option<Sandwich>, Option<Box<dyn State>>);
 }
 
 /// Initial state when not conversing with any other robot
@@ -25,48 +26,74 @@ impl State for Idle {
         input: &PhraseNode,
         lang: &Language,
         _encoder: &mut dyn Encoder,
-    ) -> (String, Option<Sandwich>, Option<Box<dyn State>>) {
+        behavior: &mut Behaviors,
+    ) -> (Option<String>, Option<Sandwich>, Option<Box<dyn State>>) {
         // Only respond if being properly greeted.
-        if let Some(WordFunction::Greeting) = input.main_verb().and_then(|v| v.definition()) {
-            (
-                lang.dictionary
-                    .first_word_in_class(WordFunction::Greeting)
-                    .0
-                    .into(),
-                None,
-                Some(Box::new(SandwichOrder::new())),
-            )
-        } else {
-            (
+        // If the other machine says "I want sandwich", then we're making one.
+        match input.main_verb().and_then(|v| v.definition()) {
+            Some(WordFunction::Desire) => {
+                if let Some(WordFunction::Sandwich) = input.object().and_then(|s| s.definition()) {
+                    return (
+                        Some(
+                            lang.dictionary
+                                .first_word_in_class(WordFunction::Greeting)
+                                .0
+                                .into(),
+                        ),
+                        None,
+                        Some(Box::new(MakingSandwich::new())),
+                    );
+                }
+            }
+            Some(WordFunction::Greeting) => {
+                return (
+                    Some(
+                        lang.dictionary
+                            .first_word_in_class(WordFunction::Greeting)
+                            .0
+                            .into(),
+                    ),
+                    None,
+                    Some(Box::new(OrderingSandwich::new(
+                        &lang.dictionary.ingredients,
+                    ))),
+                )
+            }
+            _ => (),
+        }
+
+        (
+            Some(
                 lang.dictionary
                     .first_word_in_class(WordFunction::Negation)
                     .0
                     .into(),
-                None,
-                None,
-            )
-        }
+            ),
+            None,
+            None,
+        )
     }
 }
 
 /// Receiving an order for a sandwich
-pub struct SandwichOrder {
+pub struct MakingSandwich {
     sandwich: Sandwich,
 }
-impl SandwichOrder {
+impl MakingSandwich {
     fn new() -> Self {
         Self {
             sandwich: Sandwich::default(),
         }
     }
 }
-impl State for SandwichOrder {
+impl State for MakingSandwich {
     fn respond(
         &mut self,
         input: &PhraseNode,
         lang: &Language,
         encoder: &mut dyn Encoder,
-    ) -> (String, Option<Sandwich>, Option<Box<dyn State>>) {
+        behavior: &mut Behaviors,
+    ) -> (Option<String>, Option<Sandwich>, Option<Box<dyn State>>) {
         let verb = input
             .main_verb()
             .and_then(|x| x.entry.clone())
@@ -90,17 +117,58 @@ impl State for SandwichOrder {
             })
             .unwrap();
 
-        (word.into(), sammich, None)
+        (Some(word.into()), sammich, None)
     }
 }
 
 pub struct OrderingSandwich {
     sandwich: Sandwich,
+    next_index: usize,
+    history: Vec<usize>,
 }
 impl OrderingSandwich {
     fn new(all_ingredients: &Ingredient) -> Self {
         Self {
             sandwich: Sandwich::random(all_ingredients, 5),
+            next_index: 0,
+            history: Vec::new(),
         }
+    }
+}
+impl State for OrderingSandwich {
+    fn respond(
+        &mut self,
+        input: &PhraseNode,
+        lang: &Language,
+        encoder: &mut dyn Encoder,
+        behavior: &mut Behaviors,
+    ) -> (Option<String>, Option<Sandwich>, Option<Box<dyn State>>) {
+        let mut next_ingredient = Some(self.next_index);
+        // Allow behavior to change what the next ingredient might be.
+        for b in behavior {
+            next_ingredient = b.next_ingredient(&self.sandwich, next_ingredient);
+        }
+
+        let s = if let Some(idx) = next_ingredient {
+            if idx >= self.sandwich.ingredients.len() {
+                None
+            } else {
+                let result = Some(encoder.encode(
+                    lang,
+                    PositionedIngredient {
+                        sandwich: &self.sandwich,
+                        index: idx,
+                        history: &self.history[..],
+                    },
+                ));
+                self.history.push(idx);
+                self.next_index = self.history.iter().max().unwrap_or(&0) + 1;
+                result
+            }
+        } else {
+            None
+        };
+
+        (s, None, None)
     }
 }

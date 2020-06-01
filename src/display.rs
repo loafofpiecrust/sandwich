@@ -16,8 +16,8 @@ pub type RenderSender = SyncSender<Render>;
 pub fn setup_display<'a>() -> RenderSender {
     let (sender, receiver) = sync_channel::<Render>(1);
     thread::spawn(move || {
-        let mut window = WindowSettings::new("SANDWICH", (1920, 1080))
-            .fullscreen(true)
+        let window = WindowSettings::new("SANDWICH", (1920, 1080))
+            // .fullscreen(true)
             .automatic_close(true)
             .exit_on_esc(true)
             .vsync(true)

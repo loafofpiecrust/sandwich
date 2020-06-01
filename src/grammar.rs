@@ -54,6 +54,8 @@ impl Context {}
 
 #[derive(PartialEq, Debug, Copy, Clone, Deserialize)]
 pub enum WordFunction {
+    Me,
+    You,
     Greeting,
     Affirmation,
     Negation,
@@ -62,6 +64,7 @@ pub enum WordFunction {
     Desire,
     After,
     // Lexical Functions
+    Sandwich,
     /// Has some meaning beyond function.
     Ingredient,
 }
@@ -260,6 +263,24 @@ impl PhraseNode {
                     // Objects only come from the verb phrase, subjects sit outside.
                     if let VerbPhrase(_) = x {
                         x.object()
+                    } else {
+                        None
+                    }
+                })
+                .next(),
+            _ => None,
+        }
+    }
+    pub fn subject(&self) -> Option<&AnnotatedWord> {
+        use PhraseNode::*;
+        match self {
+            Noun(x) => Some(x),
+            NounPhrase(x) => x.iter().filter_map(|x| x.subject()).next(),
+            ClausalPhrase(x) => x
+                .iter()
+                .filter_map(|x| {
+                    if let NounPhrase(_) = x {
+                        x.subject()
                     } else {
                         None
                     }

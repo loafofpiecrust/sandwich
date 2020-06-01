@@ -9,11 +9,13 @@ use crate::{
     state::{Idle, State},
     wait_randomly,
 };
+use async_std::future::timeout;
 use async_std::net::TcpStream;
 use async_std::prelude::*;
 use bincode;
 use futures::{pin_mut, select, FutureExt};
 use grammar::{sentence, Dictionary, PhraseNode};
+use rand::prelude::*;
 use seqalign::{measures::LevenshteinDamerau, Align};
 use std::{thread, time::Duration};
 
@@ -38,8 +40,6 @@ pub struct Client {
     pub state: Box<dyn State>,
     behaviors: Vec<Box<dyn Behavior>>,
     pub sandwich: Option<Sandwich>,
-    pub history: Vec<usize>,
-    next_index: usize,
     pub lang: Language,
     encoder: Box<dyn Encoder>,
 }
@@ -48,9 +48,7 @@ impl Client {
         Self {
             state: Box::new(Idle),
             behaviors: Vec::new(),
-            history: Vec::new(),
             sandwich: None,
-            next_index: 0,
             lang: Language::new(),
             encoder: Box::new(RelativeEncoder::new(0.8, DesireEncoder)),
         }
@@ -61,59 +59,60 @@ impl Client {
         let server = comm::wait_for_peer().fuse();
         pin_mut!(client, server);
         select! {
-            s = client => self.client(s?).await,
+            s = client => self.server(s?).await,
             s = server => self.server(s?).await,
         }
     }
 
     async fn server(&mut self, mut stream: TcpStream) -> anyhow::Result<()> {
-        loop {
-            // Wait for a request,
-            let mut buf = [0; 512];
-            stream.read(&mut buf).await?;
-            let request: String = dbg!(bincode::deserialize(&buf)?);
+        // Pick a random timeout for the initial handshake.
+        // TODO Influenced by shyness.
+        let waiting_time = thread_rng().gen_range(300, 1500);
+        let res = timeout(
+            Duration::from_millis(waiting_time),
+            self.single_step(&mut stream),
+        )
+        .await;
 
-            // Then respond with words and maybe a sandwich.
-            let (resp, sandwich) = self.respond(&request);
-            println!("Responding with {}", resp);
-            self.say_phrase(&resp, sandwich, &mut stream).await?;
-        }
-    }
-
-    async fn client(&mut self, mut server: TcpStream) -> anyhow::Result<()> {
-        // Initial greeting phase!
-        self.start_order(&mut server).await?;
-
-        dbg!(&self.sandwich);
-
-        // List all the ingredients I want.
-        while let Some(line) = self.next_phrase() {
-            self.say_phrase(&line, None, &mut server).await?;
-
-            // Wait for a response.
-            let response: String = {
-                let mut buffer = [0; 512];
-                server.read(&mut buffer).await?;
-                bincode::deserialize(&buffer)?
-            };
-            let sandwich: Option<Sandwich> = {
-                let mut buffer = [0; 512];
-                server.read(&mut buffer).await?;
-                bincode::deserialize(&buffer)?
-            };
-
-            println!("{}", response);
-            dbg!(sandwich);
-
-            wait_randomly(800);
+        // If we don't hear anything from the other side, initiate with our own greeting.
+        let our_order = res.is_err();
+        if our_order {
+            self.start_order(&mut stream).await?;
         }
 
-        // Say goodbye!
-        self.end_order(&mut server).await?;
+        while self.single_step(&mut stream).await? {}
 
+        if our_order {
+            self.end_order(&mut stream).await?;
+        }
         thread::sleep(Duration::from_millis(1000));
 
         Ok(())
+    }
+
+    /// Returns whether to keep going (true), or if the order is over (false).
+    async fn single_step(&mut self, stream: &mut TcpStream) -> anyhow::Result<bool> {
+        // Wait for a request,
+        let request: String = {
+            let mut buf = [0; 512];
+            stream.read(&mut buf).await?;
+            dbg!(bincode::deserialize(&buf)?)
+        };
+        let _sandwich: Option<Sandwich> = {
+            let mut buf = [0; 512];
+            stream.read(&mut buf).await?;
+            bincode::deserialize(&buf)?
+        };
+
+        // Then respond with words and maybe a sandwich.
+        let (resp, sandwich) = self.respond(&request);
+        // println!("Responding with {}", resp);
+        if let Some(resp) = resp {
+            self.say_phrase(&resp, sandwich, stream).await?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     /// Say the given phrase out loud, display the given sandwich, and send both to
@@ -147,11 +146,14 @@ impl Client {
         Ok(())
     }
 
-    pub fn respond(&mut self, input: &str) -> (String, Option<Sandwich>) {
+    pub fn respond(&mut self, input: &str) -> (Option<String>, Option<Sandwich>) {
         let sentence = self.parse(input).unwrap();
-        let (response, sandwich, next_state) =
-            self.state
-                .respond(&sentence, &self.lang, &mut *self.encoder);
+        let (response, sandwich, next_state) = self.state.respond(
+            &sentence,
+            &self.lang,
+            &mut *self.encoder,
+            &mut self.behaviors,
+        );
         if let Some(next) = next_state {
             self.state = next;
         }
@@ -168,7 +170,6 @@ impl Client {
     }
     async fn start_order(&mut self, other: &mut TcpStream) -> anyhow::Result<()> {
         let sammich = self.invent_sandwich();
-        self.next_index = 0;
         self.sandwich = Some(sammich);
         self.greet(other).await?;
         for b in &self.behaviors {
@@ -212,34 +213,34 @@ impl Client {
         println!("{}", resp);
         Ok(sandwich)
     }
-    pub fn next_phrase(&mut self) -> Option<String> {
-        let sandwich = self.sandwich.as_ref().unwrap();
+    // pub fn next_phrase(&mut self) -> Option<String> {
+    //     let sandwich = self.sandwich.as_ref().unwrap();
 
-        let mut next_ingredient = Some(self.next_index);
-        // Allow behavior to change what the next ingredient might be.
-        for b in &mut self.behaviors {
-            next_ingredient = b.next_ingredient(sandwich, next_ingredient);
-        }
+    //     let mut next_ingredient = Some(self.next_index);
+    //     // Allow behavior to change what the next ingredient might be.
+    //     for b in &mut self.behaviors {
+    //         next_ingredient = b.next_ingredient(sandwich, next_ingredient);
+    //     }
 
-        if let Some(idx) = next_ingredient {
-            if idx >= sandwich.ingredients.len() {
-                return None;
-            }
-            let result = Some(self.encoder.encode(
-                &self.lang,
-                PositionedIngredient {
-                    sandwich,
-                    index: idx,
-                    history: &self.history[..],
-                },
-            ));
-            self.history.push(idx);
-            self.next_index = self.history.iter().max().unwrap_or(&0) + 1;
-            result
-        } else {
-            None
-        }
-    }
+    //     if let Some(idx) = next_ingredient {
+    //         if idx >= sandwich.ingredients.len() {
+    //             return None;
+    //         }
+    //         let result = Some(self.encoder.encode(
+    //             &self.lang,
+    //             PositionedIngredient {
+    //                 sandwich,
+    //                 index: idx,
+    //                 history: &self.history[..],
+    //             },
+    //         ));
+    //         self.history.push(idx);
+    //         self.next_index = self.history.iter().max().unwrap_or(&0) + 1;
+    //         result
+    //     } else {
+    //         None
+    //     }
+    // }
 
     /// Returns a score for the match between the sandwich we wanted and the sandwich we got.
     /// TODO A low enough score may warrant revisions, depending on how shy this client is.

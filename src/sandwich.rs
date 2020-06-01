@@ -22,6 +22,14 @@ impl Ingredient {
         &self.name
     }
 
+    pub fn includes(&self, other: &Ingredient) -> bool {
+        self == other
+            || self
+                .children
+                .as_ref()
+                .map_or(false, |children| children.iter().any(|x| x.includes(other)))
+    }
+
     pub fn random(&self) -> &Ingredient {
         if let Some(children) = &self.children {
             children

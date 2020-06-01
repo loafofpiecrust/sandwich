@@ -22,6 +22,8 @@ pub struct PositionedIngredient<'a> {
     pub index: usize,
 }
 
+pub type Behaviors = Vec<Box<dyn Behavior>>;
+
 pub trait Behavior {
     fn start(&self);
     fn end(&self);
@@ -95,6 +97,7 @@ impl Encoder for DesireEncoder {
             .ingredients
             .to_word(&ingredient, String::new())
             .unwrap();
+        // TODO Support for negative here.
         let (verb, _) = context.dictionary.first_word_in_class(WordFunction::Desire);
         format!("{} {}", obj, verb)
     }
@@ -125,6 +128,23 @@ impl Encoder for DesireEncoder {
             _ => (),
         }
         false
+    }
+}
+
+pub struct NegativeEncoder;
+impl Encoder for NegativeEncoder {
+    fn encode(&mut self, lang: &Language, item: PositionedIngredient) -> String {
+        // TODO How do we know what we don't want?
+        todo!()
+    }
+    fn decode(&mut self, phrase: &PhraseNode, sandwich: &mut Sandwich, lang: &Language) -> bool {
+        todo!()
+    }
+    fn noun_phrase<'a>(
+        &self,
+        input: &'a [AnnotatedWord],
+    ) -> IResult<&'a [AnnotatedWord], PhraseNode> {
+        todo!()
     }
 }
 

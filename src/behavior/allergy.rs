@@ -1,5 +1,9 @@
 use super::Behavior;
-use crate::sandwich::{Ingredient, Sandwich};
+use crate::{
+    client::Language,
+    grammar::WordFunction,
+    sandwich::{Ingredient, Sandwich},
+};
 
 pub enum Severity {
     Minor,
@@ -19,6 +23,14 @@ impl Severity {
     }
 }
 
+/// Behavior provides motivation for a change to the sandwich, so
+/// Sandwich (current) => Sandwich (desired)
+/// Encoder provides a method for expressing a patch to the Sandwich.
+/// This may mean adding on top (DesireEncoder), adding in the middle (RelativeEncoder),
+/// removing (NegationEncoder). Each level of encoder needs to be able to affect but also
+/// invoke all layers contained within. NegationEncoder, for example, needs to turn all
+/// inner additions into removals.
+
 /// TODO Define severity breakpoints
 pub struct Allergy {
     severity: Severity,
@@ -31,7 +43,24 @@ impl Allergy {
             ingredient,
         }
     }
-    fn react(&self, sandwich: &Sandwich) {}
+    fn is_allergic(&self, ingredient: &Ingredient) -> bool {
+        self.ingredient.includes(ingredient)
+    }
+    fn react(&self, sandwich: &Sandwich, lang: &Language) -> Option<String> {
+        // Need access to the dictionary.
+        let allergic = sandwich
+            .ingredients
+            .iter()
+            .filter(|x| self.is_allergic(x))
+            .next();
+        allergic.map(|bad_item| {
+            // Say "remove this ingredient"
+            let verb = lang.dictionary.first_word_in_class(WordFunction::Desire);
+            let neg = lang.dictionary.first_word_in_class(WordFunction::Negation);
+            let ingr = lang.dictionary.ingredients.to_word(bad_item, String::new());
+            format!("{} {} {}", ingr.unwrap(), verb.0, neg.0)
+        })
+    }
 }
 impl Behavior for Allergy {
     fn start(&self) {
