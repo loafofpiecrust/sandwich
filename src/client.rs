@@ -67,7 +67,7 @@ impl Client {
     async fn server(&mut self, mut stream: TcpStream) -> anyhow::Result<()> {
         // Pick a random timeout for the initial handshake.
         // TODO Influenced by shyness.
-        let waiting_time = 100;
+        let waiting_time = thread_rng().gen_range(300, 1500);
         println!("Waiting {}ms before ordering", waiting_time);
         let res = timeout(
             Duration::from_millis(waiting_time),
@@ -114,7 +114,7 @@ impl Client {
                 stream.read(&mut buf).await?;
                 dbg!(bincode::deserialize(&buf)?)
             };
-            let _sandwich: Option<Sandwich> = {
+            let sandwich: Option<Sandwich> = {
                 let mut buf = [0; 512];
                 stream.read(&mut buf).await?;
                 bincode::deserialize(&buf)?
