@@ -208,6 +208,7 @@ pub enum PhraseNode {
     Verb(AnnotatedWord),
     Position(AnnotatedWord),
     PositionalPhrase(Vec<PhraseNode>),
+    Empty,
 }
 impl PhraseNode {
     // TODO Handle special phrases like greetings.
@@ -296,6 +297,7 @@ impl PhraseNode {
                 x.iter().map(|x| x.subtitles()).join(" ")
             }
             Noun(x) | Verb(x) | Position(x) => x.entry.as_ref().unwrap().definition.clone(),
+            Empty => String::new(),
         }
     }
 }

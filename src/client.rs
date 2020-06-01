@@ -6,7 +6,7 @@ use crate::{
     grammar,
     grammar::WordFunction,
     sandwich::Sandwich,
-    state::{Idle, State},
+    state::{Idle, OrderingSandwich, State},
     wait_randomly,
 };
 use async_std::future::timeout;
@@ -67,11 +67,11 @@ impl Client {
     async fn server(&mut self, mut stream: TcpStream) -> anyhow::Result<()> {
         // Pick a random timeout for the initial handshake.
         // TODO Influenced by shyness.
-        let waiting_time = thread_rng().gen_range(300, 1500);
+        let waiting_time = 100;
         println!("Waiting {}ms before ordering", waiting_time);
         let res = timeout(
             Duration::from_millis(waiting_time),
-            self.single_step(&mut stream),
+            self.single_step(&mut stream, false),
         )
         .await;
 
@@ -82,7 +82,7 @@ impl Client {
             self.start_order(&mut stream).await?;
         }
 
-        while self.single_step(&mut stream).await? {}
+        while self.single_step(&mut stream, false).await? {}
 
         if our_order {
             println!("ending the order");
@@ -94,28 +94,37 @@ impl Client {
     }
 
     /// Returns whether to keep going (true), or if the order is over (false).
-    async fn single_step(&mut self, stream: &mut TcpStream) -> anyhow::Result<bool> {
-        // Wait for a request,
-        let request: String = {
-            let mut buf = [0; 512];
-            stream.read(&mut buf).await?;
-            dbg!(bincode::deserialize(&buf)?)
+    async fn single_step(
+        &mut self,
+        stream: &mut TcpStream,
+        skip_input: bool,
+    ) -> anyhow::Result<bool> {
+        let request = if skip_input {
+            None
+        } else {
+            // Wait for a request,
+            let request: String = {
+                let mut buf = [0; 512];
+                stream.read(&mut buf).await?;
+                dbg!(bincode::deserialize(&buf)?)
+            };
+            let _sandwich: Option<Sandwich> = {
+                let mut buf = [0; 512];
+                stream.read(&mut buf).await?;
+                bincode::deserialize(&buf)?
+            };
+            println!("Received from the other side!");
+            Some(request)
         };
-        let _sandwich: Option<Sandwich> = {
-            let mut buf = [0; 512];
-            stream.read(&mut buf).await?;
-            bincode::deserialize(&buf)?
-        };
-        println!("Received from the other side!");
 
         // Then respond with words and maybe a sandwich.
-        let (resp, sandwich) = self.respond(&request);
+        let (resp, sandwich) = self.respond(request.as_ref().map(|x| x as &str));
         // println!("Responding with {}", resp);
         if let Some(resp) = resp {
             self.say_phrase(&resp, sandwich, stream).await?;
             Ok(true)
         } else {
-            Ok(false)
+            Ok(true)
         }
     }
 
@@ -127,13 +136,18 @@ impl Client {
         sandwich: Option<Sandwich>,
         stream: &mut TcpStream,
     ) -> anyhow::Result<()> {
+        println!("saying {}", phrase);
+
         let mut buf = [0; 512];
         bincode::serialize_into(&mut buf as &mut [u8], &sandwich)?;
 
         // Convert phrase to subtitles!
         self.lang.render(Render {
             ingredients: sandwich.map(|x| x.ingredients).unwrap_or_default(),
-            subtitles: self.parse(phrase).unwrap().subtitles(),
+            subtitles: self
+                .parse(phrase)
+                .map(|x| x.subtitles())
+                .unwrap_or_default(),
         })?;
 
         // Play the phrase out loud.
@@ -150,8 +164,10 @@ impl Client {
         Ok(())
     }
 
-    pub fn respond(&mut self, input: &str) -> (Option<String>, Option<Sandwich>) {
-        let sentence = self.parse(input).unwrap();
+    pub fn respond(&mut self, input: Option<&str>) -> (Option<String>, Option<Sandwich>) {
+        let sentence = input
+            .and_then(|i| self.parse(i))
+            .unwrap_or(PhraseNode::Empty);
         let (response, sandwich, next_state) = self.state.respond(
             &sentence,
             &self.lang,
@@ -176,6 +192,7 @@ impl Client {
     async fn start_order(&mut self, other: &mut TcpStream) -> anyhow::Result<()> {
         // TODO Use encoder for "I want sandwich" => "ku nu"
         self.say_phrase("ku nu", None, other).await?;
+        self.state = Box::new(OrderingSandwich::new(&self.lang.dictionary.ingredients));
         for b in &self.behaviors {
             b.start();
         }

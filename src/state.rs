@@ -48,12 +48,7 @@ impl State for Idle {
             }
             Some(WordFunction::Greeting) => {
                 return (
-                    Some(
-                        lang.dictionary
-                            .first_word_in_class(WordFunction::Greeting)
-                            .0
-                            .into(),
-                    ),
+                    Some("ku nu".into()),
                     None,
                     Some(Box::new(OrderingSandwich::new(
                         &lang.dictionary.ingredients,
@@ -130,7 +125,7 @@ pub struct OrderingSandwich {
     history: Vec<usize>,
 }
 impl OrderingSandwich {
-    fn new(all_ingredients: &Ingredient) -> Self {
+    pub fn new(all_ingredients: &Ingredient) -> Self {
         Self {
             sandwich: Sandwich::random(all_ingredients, 5),
             next_index: 0,
