@@ -63,6 +63,7 @@ pub enum WordFunction {
     Action,
     Desire,
     After,
+    Before,
     // Lexical Functions
     Sandwich,
     /// Has some meaning beyond function.
@@ -287,6 +288,16 @@ impl PhraseNode {
                     }
                 })
                 .next(),
+            _ => None,
+        }
+    }
+    pub fn pos(&self) -> Option<&AnnotatedWord> {
+        use PhraseNode::*;
+        match self {
+            Position(x) => Some(x),
+            PositionalPhrase(x) | NounPhrase(x) | VerbPhrase(x) | ClausalPhrase(x) => {
+                x.iter().filter_map(|x| x.pos()).next()
+            }
             _ => None,
         }
     }

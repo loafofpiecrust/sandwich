@@ -5,6 +5,7 @@ use crate::{
     client::Language,
     sandwich::{Ingredient, Sandwich},
 };
+use seqalign::{measures::LevenshteinDamerau, Align};
 
 pub trait State: std::fmt::Debug {
     // TODO Make this `respond(self) -> Box<dyn State>` so we can move data at the end of
@@ -12,6 +13,7 @@ pub trait State: std::fmt::Debug {
     fn respond(
         &mut self,
         input: &PhraseNode,
+        sandwich: Option<&Sandwich>,
         lang: &Language,
         encoder: &mut dyn Encoder,
         behavior: &mut Behaviors,
@@ -25,6 +27,7 @@ impl State for Idle {
     fn respond(
         &mut self,
         input: &PhraseNode,
+        sandwich: Option<&Sandwich>,
         lang: &Language,
         _encoder: &mut dyn Encoder,
         behavior: &mut Behaviors,
@@ -87,6 +90,7 @@ impl State for MakingSandwich {
     fn respond(
         &mut self,
         input: &PhraseNode,
+        sandwich: Option<&Sandwich>,
         lang: &Language,
         encoder: &mut dyn Encoder,
         behavior: &mut Behaviors,
@@ -132,11 +136,22 @@ impl OrderingSandwich {
             history: Vec::new(),
         }
     }
+    /// Returns a score for the match between the sandwich we wanted and the sandwich we got.
+    /// TODO A low enough score may warrant revisions, depending on how shy this client is.
+    pub fn judge_sandwich(&self, result: &Sandwich) -> f64 {
+        // For now, just count the number of ingredients that match.
+        // TODO Count the number of matching *morphemes*.
+        // Number of correct ingredients we did ask for.
+        let measure = LevenshteinDamerau::new(1, 1, 1, 1);
+        let alignment = measure.align(&result.ingredients, &self.sandwich.ingredients);
+        1.0 / (alignment.distance() + 1) as f64
+    }
 }
 impl State for OrderingSandwich {
     fn respond(
         &mut self,
         input: &PhraseNode,
+        sandwich: Option<&Sandwich>,
         lang: &Language,
         encoder: &mut dyn Encoder,
         behavior: &mut Behaviors,
@@ -148,6 +163,12 @@ impl State for OrderingSandwich {
         }
 
         println!("next ingredient: {:?}", next_ingredient);
+
+        if let Some(result) = sandwich {
+            // Score the given sandwich.
+            let score = self.judge_sandwich(result);
+            println!("sandwich score: {}", score);
+        }
 
         let s = if let Some(idx) = next_ingredient {
             if idx >= self.sandwich.ingredients.len() {

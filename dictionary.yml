@@ -18,6 +18,10 @@ sa:
   function: After
   role: Preposition
   definition: "after"
+pi:
+  function: Before
+  role: Preposition
+  definition: "after"
 nu: # to want
   role: Verb
   function: Desire

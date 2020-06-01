@@ -186,37 +186,71 @@ impl Encoder for RelativeEncoder {
     fn encode(&mut self, context: &Language, item: PositionedIngredient) -> String {
         let last_order = *item.history.last().unwrap_or(&0);
         println!("Encoding relative maybe? {:?}", item);
-        if item.index != last_order && item.index != last_order + 1 && item.index > 0 {
-            // We want this ingredient after the closest one before it that we already
-            // asked for.
-            let previous = item
-                .history
-                .iter()
-                .filter(|x| **x < item.index)
-                .max()
-                .map(|x| *x)
-                .unwrap_or(item.history.len() - 1);
-            let prev_word = context
-                .dictionary
-                .ingredients
-                .to_word(&item.sandwich.ingredients[previous], String::new())
-                .unwrap();
-            let (prep, _) = context.dictionary.first_word_in_class(WordFunction::After);
-            // Syntax is: V'[PP[NP P] V'...]
-            match self.pick_side() {
-                // TODO Allow the head/inner to switch sides!
-                HeadSide::Pre => format!(
-                    "{} {} {}",
-                    self.inner.encode(context, item),
-                    prep,
-                    prev_word,
-                ),
-                HeadSide::Post => format!(
-                    "{} {} {}",
-                    prev_word,
-                    prep,
-                    self.inner.encode(context, item),
-                ),
+        if item.index != last_order && item.index != last_order + 1 {
+            if item.index > 0 {
+                // We want this ingredient after the closest one before it that we already
+                // asked for.
+                let previous = item
+                    .history
+                    .iter()
+                    .filter(|x| **x < item.index)
+                    .max()
+                    .map(|x| *x)
+                    .unwrap_or(item.history.len() - 1);
+                let prev_word = context
+                    .dictionary
+                    .ingredients
+                    .to_word(&item.sandwich.ingredients[previous], String::new())
+                    .unwrap();
+                let (prep, _) = context.dictionary.first_word_in_class(WordFunction::After);
+                // Syntax is: V'[PP[NP P] V'...]
+                match self.pick_side() {
+                    // TODO Allow the head/inner to switch sides!
+                    HeadSide::Pre => format!(
+                        "{} {} {}",
+                        self.inner.encode(context, item),
+                        prep,
+                        prev_word,
+                    ),
+                    HeadSide::Post => format!(
+                        "{} {} {}",
+                        prev_word,
+                        prep,
+                        self.inner.encode(context, item),
+                    ),
+                }
+            } else {
+                // We want this ingredient after the closest one before it that we already
+                // asked for.
+                let next = item
+                    .history
+                    .iter()
+                    .filter(|x| **x > item.index)
+                    .min()
+                    .map(|x| *x)
+                    .unwrap_or(0);
+                let prev_word = context
+                    .dictionary
+                    .ingredients
+                    .to_word(&item.sandwich.ingredients[next], String::new())
+                    .unwrap();
+                let (prep, _) = context.dictionary.first_word_in_class(WordFunction::Before);
+                // Syntax is: V'[PP[NP P] V'...]
+                match self.pick_side() {
+                    // TODO Allow the head/inner to switch sides!
+                    HeadSide::Pre => format!(
+                        "{} {} {}",
+                        self.inner.encode(context, item),
+                        prep,
+                        prev_word,
+                    ),
+                    HeadSide::Post => format!(
+                        "{} {} {}",
+                        prev_word,
+                        prep,
+                        self.inner.encode(context, item),
+                    ),
+                }
             }
         } else {
             self.inner.encode(context, item)
@@ -247,6 +281,7 @@ impl Encoder for RelativeEncoder {
             // look for a prepositional phrase in the object of the main verb.
             if let Some(PhraseNode::PositionalPhrase(parts)) = phrase.object_phrase() {
                 if let [np1, p, np2] = &parts[..] {
+                    let p = p.pos().unwrap();
                     // TODO Use successfulness to change bias rather than just by random.
                     let (existing_np, new_np) = match self.pick_side() {
                         HeadSide::Pre => (np2, np1),
@@ -265,7 +300,12 @@ impl Encoder for RelativeEncoder {
                     let idx = sandwich.ingredients.iter().position(|x| x == existing);
                     if let Some(idx) = idx {
                         // TODO Consider which type of position it is. For now assuming "after".
-                        sandwich.ingredients.insert(idx + 1, new.clone());
+                        let dest_idx = match p.definition() {
+                            Some(WordFunction::After) => idx + 1,
+                            Some(WordFunction::Before) => idx,
+                            _ => idx,
+                        };
+                        sandwich.ingredients.insert(dest_idx, new.clone());
                         // We successfully used a positional phrase, so up our accuracy!
                         if self.accuracy < MAX_ACCURACY {
                             self.accuracy += 0.1;

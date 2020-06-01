@@ -105,8 +105,8 @@ impl Client {
         stream: &mut TcpStream,
         skip_input: bool,
     ) -> anyhow::Result<bool> {
-        let request = if skip_input {
-            None
+        let (request, sandwich) = if skip_input {
+            (None, None)
         } else {
             // Wait for a request,
             let request: String = {
@@ -119,13 +119,13 @@ impl Client {
                 stream.read(&mut buf).await?;
                 bincode::deserialize(&buf)?
             };
-            println!("Received from the other side!");
-            Some(request)
+            println!("Received from the other side! {}", request);
+            println!("Sandwich: {:?}", sandwich);
+            (Some(request), sandwich)
         };
 
         // Then respond with words and maybe a sandwich.
-        let (resp, sandwich) = self.respond(request.as_ref().map(|x| x as &str));
-        // println!("Responding with {}", resp);
+        let (resp, sandwich) = self.respond(request.as_ref().map(|x| x as &str), sandwich.as_ref());
         if let Some(resp) = resp {
             let cont = sandwich.is_none();
             self.say_phrase(&resp, sandwich, stream).await?;
@@ -144,6 +144,7 @@ impl Client {
         stream: &mut TcpStream,
     ) -> anyhow::Result<()> {
         println!("saying {}", phrase);
+        println!("with sandwich {:?}", sandwich);
 
         let mut buf = [0; 512];
         bincode::serialize_into(&mut buf as &mut [u8], &sandwich)?;
@@ -168,12 +169,17 @@ impl Client {
         Ok(())
     }
 
-    pub fn respond(&mut self, input: Option<&str>) -> (Option<String>, Option<Sandwich>) {
+    pub fn respond(
+        &mut self,
+        input: Option<&str>,
+        sandwich: Option<&Sandwich>,
+    ) -> (Option<String>, Option<Sandwich>) {
         let sentence = input
             .and_then(|i| self.parse(i))
             .unwrap_or(PhraseNode::Empty);
         let (response, sandwich, next_state) = self.state.respond(
             &sentence,
+            sandwich,
             &self.lang,
             &mut *self.encoder,
             &mut self.behaviors,
@@ -202,18 +208,20 @@ impl Client {
         }
         Ok(())
     }
-    async fn end_order(&mut self, other: &mut TcpStream) -> anyhow::Result<f64> {
+    async fn end_order(&mut self, other: &mut TcpStream) -> anyhow::Result<()> {
         for b in &self.behaviors {
             b.end();
         }
-        let score = self
-            .greet(other)
-            .await?
-            .map(|x| self.judge_sandwich(&x))
-            .unwrap_or(0.0);
-        println!("sandwich score: {}", score);
+        let sandwich = self.greet(other).await?;
+        self.state.respond(
+            &PhraseNode::Empty,
+            sandwich.as_ref(),
+            &self.lang,
+            &mut *self.encoder,
+            &mut self.behaviors,
+        );
         // self.sandwich = None;
-        Ok(score)
+        Ok(())
     }
     async fn greet(&self, other: &mut TcpStream) -> anyhow::Result<Option<Sandwich>> {
         let (hello, _) = self
@@ -236,6 +244,7 @@ impl Client {
         };
 
         println!("{}", resp);
+        println!("Received sandwich: {:?}", sandwich);
         Ok(sandwich)
     }
     // pub fn next_phrase(&mut self) -> Option<String> {
@@ -266,19 +275,4 @@ impl Client {
     //         None
     //     }
     // }
-
-    /// Returns a score for the match between the sandwich we wanted and the sandwich we got.
-    /// TODO A low enough score may warrant revisions, depending on how shy this client is.
-    pub fn judge_sandwich(&self, result: &Sandwich) -> f64 {
-        // For now, just count the number of ingredients that match.
-        // TODO Count the number of matching *morphemes*.
-        if let Some(sandwich) = &self.sandwich {
-            // Number of correct ingredients we did ask for.
-            let measure = LevenshteinDamerau::new(1, 1, 1, 1);
-            let alignment = measure.align(&result.ingredients, &sandwich.ingredients);
-            1.0 / (alignment.distance() + 1) as f64
-        } else {
-            0.0
-        }
-    }
 }
