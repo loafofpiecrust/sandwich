@@ -82,7 +82,13 @@ impl Client {
             self.start_order(&mut stream).await?;
         }
 
-        while self.single_step(&mut stream, false).await? {}
+        while {
+            timeout(
+                Duration::from_millis(3000),
+                self.single_step(&mut stream, false),
+            )
+            .await??
+        } {}
 
         if our_order {
             println!("ending the order");
@@ -121,10 +127,11 @@ impl Client {
         let (resp, sandwich) = self.respond(request.as_ref().map(|x| x as &str));
         // println!("Responding with {}", resp);
         if let Some(resp) = resp {
+            let cont = sandwich.is_none();
             self.say_phrase(&resp, sandwich, stream).await?;
-            Ok(true)
+            Ok(cont)
         } else {
-            Ok(true)
+            Ok(false)
         }
     }
 
