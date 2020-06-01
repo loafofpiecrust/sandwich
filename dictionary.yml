@@ -22,3 +22,7 @@ nu: # to want
   role: Verb
   function: Desire
   definition: "want"
+ku:
+  role: Noun
+  function: Sandwich
+  definition: "sandwich"

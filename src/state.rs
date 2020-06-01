@@ -6,7 +6,7 @@ use crate::{
     sandwich::{Ingredient, Sandwich},
 };
 
-pub trait State {
+pub trait State: std::fmt::Debug {
     // TODO Make this `respond(self) -> Box<dyn State>` so we can move data at the end of
     // a state.
     fn respond(
@@ -19,6 +19,7 @@ pub trait State {
 }
 
 /// Initial state when not conversing with any other robot
+#[derive(Debug)]
 pub struct Idle;
 impl State for Idle {
     fn respond(
@@ -76,6 +77,7 @@ impl State for Idle {
 }
 
 /// Receiving an order for a sandwich
+#[derive(Debug)]
 pub struct MakingSandwich {
     sandwich: Sandwich,
 }
@@ -121,6 +123,7 @@ impl State for MakingSandwich {
     }
 }
 
+#[derive(Debug)]
 pub struct OrderingSandwich {
     sandwich: Sandwich,
     next_index: usize,
@@ -148,6 +151,8 @@ impl State for OrderingSandwich {
         for b in behavior {
             next_ingredient = b.next_ingredient(&self.sandwich, next_ingredient);
         }
+
+        println!("next ingredient: {:?}", next_ingredient);
 
         let s = if let Some(idx) = next_ingredient {
             if idx >= self.sandwich.ingredients.len() {

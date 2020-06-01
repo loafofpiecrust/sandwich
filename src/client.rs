@@ -68,6 +68,7 @@ impl Client {
         // Pick a random timeout for the initial handshake.
         // TODO Influenced by shyness.
         let waiting_time = thread_rng().gen_range(300, 1500);
+        println!("Waiting {}ms before ordering", waiting_time);
         let res = timeout(
             Duration::from_millis(waiting_time),
             self.single_step(&mut stream),
@@ -77,12 +78,14 @@ impl Client {
         // If we don't hear anything from the other side, initiate with our own greeting.
         let our_order = res.is_err();
         if our_order {
+            println!("requesting an order!");
             self.start_order(&mut stream).await?;
         }
 
         while self.single_step(&mut stream).await? {}
 
         if our_order {
+            println!("ending the order");
             self.end_order(&mut stream).await?;
         }
         thread::sleep(Duration::from_millis(1000));
@@ -103,6 +106,7 @@ impl Client {
             stream.read(&mut buf).await?;
             bincode::deserialize(&buf)?
         };
+        println!("Received from the other side!");
 
         // Then respond with words and maybe a sandwich.
         let (resp, sandwich) = self.respond(&request);
@@ -155,6 +159,7 @@ impl Client {
             &mut self.behaviors,
         );
         if let Some(next) = next_state {
+            println!("Transitioning to {:?}", next);
             self.state = next;
         }
         (response, sandwich)
@@ -169,9 +174,8 @@ impl Client {
         self.behaviors.push(Box::new(b));
     }
     async fn start_order(&mut self, other: &mut TcpStream) -> anyhow::Result<()> {
-        let sammich = self.invent_sandwich();
-        self.sandwich = Some(sammich);
-        self.greet(other).await?;
+        // TODO Use encoder for "I want sandwich" => "ku nu"
+        self.say_phrase("ku nu", None, other).await?;
         for b in &self.behaviors {
             b.start();
         }
@@ -187,7 +191,7 @@ impl Client {
             .map(|x| self.judge_sandwich(&x))
             .unwrap_or(0.0);
         println!("sandwich score: {}", score);
-        self.sandwich = None;
+        // self.sandwich = None;
         Ok(score)
     }
     async fn greet(&self, other: &mut TcpStream) -> anyhow::Result<Option<Sandwich>> {

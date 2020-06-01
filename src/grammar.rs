@@ -183,7 +183,7 @@ pub fn sentence(input: &[u8], lang: &Language, encoder: &dyn Encoder) -> Option<
     if let Ok((_, parsed)) = phrase(input) {
         let tagged = annotate(parsed, lang);
         if let Ok((_, tree)) = clause(&tagged, encoder) {
-            std::dbg!(&tree);
+            // std::dbg!(&tree);
             Some(tree)
         } else {
             // Try again with unknown words removed.

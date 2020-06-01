@@ -1,6 +1,12 @@
 # Sandwich
 Machines in a room having a conversation about sandwiches.
 
+## Operation
+All machines run the same program, which simultaneously scans for peers to talk to about sandwiches and keeps a server open listening for peers trying to connect.
+All machines have the same list of hostnames that represents the full roster of machines, letting them request conversations specifically with their peers.
+
+# Resources
+
 ## Creative Resources
 - I'm using tones based off of dial tones to sound each syllable. [DTMF Tones](http://www.dialabc.com/sound/dtmf.html)
 - [This artist's work](https://www.istockphoto.com/portfolio/bad_arithmetic?assettype=image&sort=mostpopular) is similar to how I've been imagining the sandwich imagery.
