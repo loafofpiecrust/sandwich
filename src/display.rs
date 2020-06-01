@@ -6,8 +6,8 @@ use std::thread;
 
 #[derive(Debug, Default)]
 pub struct Render {
-    pub ingredients: Vec<Ingredient>,
-    pub subtitles: String,
+    pub ingredients: Option<Vec<Ingredient>>,
+    pub subtitles: Option<String>,
 }
 
 pub type RenderSender = SyncSender<Render>;
@@ -37,12 +37,11 @@ pub fn setup_display<'a>() -> RenderSender {
             let mut textures = Vec::new();
             let mut subtitles = String::new();
             while let Some(e) = window.next() {
-                window.draw_2d(&e, |c, g, d| {
-                    // Try to receive render updates if there are any.
-                    if let Ok(render) = receiver.try_recv() {
-                        // Convert ingredient name to texture of "images/ingredient-name.png"
-                        textures = render
-                            .ingredients
+                // Try to receive render updates if there are any.
+                if let Ok(render) = receiver.try_recv() {
+                    // Convert ingredient name to texture of "images/ingredient-name.png"
+                    if let Some(ingr) = render.ingredients {
+                        textures = ingr
                             .into_iter()
                             .map(|x| {
                                 texture_map
@@ -61,9 +60,12 @@ pub fn setup_display<'a>() -> RenderSender {
                                     .clone()
                             })
                             .collect();
-                        subtitles = render.subtitles;
                     }
-
+                    if let Some(subs) = render.subtitles {
+                        subtitles = subs;
+                    }
+                }
+                window.draw_2d(&e, |c, g, d| {
                     clear([0.0, 0.0, 0.0, 1.0], g);
 
                     // Render the subtitles.

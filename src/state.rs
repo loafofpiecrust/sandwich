@@ -109,8 +109,8 @@ impl State for MakingSandwich {
         let (word, entry) = lang.dictionary.first_word_in_class(word);
         lang.display
             .send(Render {
-                ingredients: self.sandwich.ingredients.clone(),
-                subtitles: entry.definition.clone(),
+                ingredients: Some(self.sandwich.ingredients.clone()),
+                subtitles: Some(entry.definition.clone()),
             })
             .unwrap();
 

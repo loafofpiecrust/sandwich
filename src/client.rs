@@ -150,11 +150,8 @@ impl Client {
 
         // Convert phrase to subtitles!
         self.lang.render(Render {
-            ingredients: sandwich.map(|x| x.ingredients).unwrap_or_default(),
-            subtitles: self
-                .parse(phrase)
-                .map(|x| x.subtitles())
-                .unwrap_or_default(),
+            ingredients: sandwich.map(|x| x.ingredients),
+            subtitles: self.parse(phrase).map(|x| x.subtitles()),
         })?;
 
         // Play the phrase out loud.
