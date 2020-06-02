@@ -128,9 +128,15 @@ impl Operation for Remove {
 //     }
 // }
 
+struct Allergy {
+    ingredient: Ingredient,
+    severity: f64,
+}
+
 pub struct Order {
     forgotten: Vec<Box<dyn Operation>>,
     history: Vec<Box<dyn Operation>>,
+    allergies: Vec<Allergy>,
     personality: Personality,
     desired: Sandwich,
 }
@@ -142,9 +148,14 @@ impl Order {
             personality: Personality::new(),
             // TODO Pick a sandwich based on our personality.
             desired: Sandwich::random(&lang.dictionary.ingredients, 5),
+            allergies: vec![Allergy {
+                severity: 0.5,
+                ingredient: lang.dictionary.ingredients.random().clone(),
+            }],
         }
     }
     pub fn pick_op(&mut self, result: &Sandwich) -> Box<dyn Operation> {
+        let mut rng = thread_rng();
         // The basic behavior: pick the next ingredient on the sandwich.
         // Find the top-most shared ingredient between desired and result.
         let last_shared = self
@@ -154,6 +165,7 @@ impl Order {
             .rposition(|x| result.ingredients.contains(x));
         // We want to add the next one!
         let next_idx = last_shared.map(|i| i + 1).unwrap_or(0);
+
         // There's a mistake if any preceding ingredients aren't in the result sandwich.
         // NOTE disregarding order for the moment.
         let mistake = self
@@ -163,7 +175,7 @@ impl Order {
             .take(next_idx)
             .position(|x| !result.ingredients.contains(x));
         // If we aren't shy, try to correct a mistake!
-        if mistake.is_some() && !thread_rng().gen_bool(self.personality.shyness) {
+        if mistake.is_some() && !rng.gen_bool(self.personality.shyness) {
             let idx = mistake.unwrap();
             // Pick a preposition to position the missing ingredient where we'd like it.
             // TODO If this machine doesn't care about ordering, then just ask to add it to the end.
@@ -190,14 +202,31 @@ impl Order {
                 before.map(|b| Relative::After(b.clone()))
             }
             .unwrap_or(Relative::Top);
-            Box::new(Add(self.desired.ingredients[idx].clone(), rel))
-        } else {
-            // Default behavior, just add the next ingredient to the top of the sandwich.
-            Box::new(Add(
-                self.desired.ingredients[next_idx].clone(),
-                Relative::Top,
-            ))
+            return Box::new(Add(self.desired.ingredients[idx].clone(), rel));
         }
+
+        // Check for allergens in the result sandwich.
+        let allergen = self
+            .allergies
+            .iter()
+            // TODO Use contains logic here instead of exact match, allowing
+            // allergies to whole categories.
+            .filter(|a| result.ingredients.iter().any(|x| &a.ingredient == x))
+            .next();
+
+        if let Some(allergen) = allergen {
+            // If the allergy is severe and we aren't shy about it, ask for that
+            // ingredient to be removed.
+            if rng.gen_bool(allergen.severity) && !rng.gen_bool(self.personality.shyness) {
+                return Box::new(Remove(allergen.ingredient.clone()));
+            }
+        }
+
+        // Default behavior, just add the next ingredient to the top of the sandwich.
+        Box::new(Add(
+            self.desired.ingredients[next_idx].clone(),
+            Relative::Top,
+        ))
     }
 }
 
