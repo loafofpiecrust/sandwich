@@ -1,3 +1,4 @@
+use crate::behavior::{ops, Operation};
 use crate::{behavior::Encoder, client::Language, sandwich::Ingredient};
 use itertools::Itertools;
 use nom::{branch::*, bytes::complete::*, combinator::*, multi::*, sequence::*, IResult, *};
@@ -180,6 +181,23 @@ pub fn annotate(phrase: Phrase, context: &Language) -> AnnotatedPhrase {
     result
 }
 
+pub fn sentence_new(input: &[u8], lang: &Language) -> Option<Box<dyn Operation>> {
+    phrase(input).ok().and_then(|(_, parsed)| {
+        let tagged = annotate(parsed, lang);
+        if let Ok((_, op)) = clause_new(&tagged, lang) {
+            Some(op)
+        } else {
+            // Try again with unknown words removed.
+            let nt = tagged
+                .into_iter()
+                .filter(|x| x.role.is_some() || x.entry.is_some())
+                .collect_vec();
+            let c = clause_new(&nt, lang);
+            c.ok().map(|(_, t)| t)
+        }
+    })
+}
+
 pub fn sentence(input: &[u8], lang: &Language, encoder: &dyn Encoder) -> Option<PhraseNode> {
     if let Ok((_, parsed)) = phrase(input) {
         let tagged = annotate(parsed, lang);
@@ -322,10 +340,33 @@ pub fn noun(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], PhraseNode> {
     }
 }
 
+fn ingredient<'a>(
+    input: &'a [AnnotatedWord],
+    lang: &Language,
+) -> IResult<&'a [AnnotatedWord], Ingredient> {
+    if input.len() > 0 && input[0].role == Some(WordRole::Noun)
+    // && input[0].function == Some(WordFunction::Ingredient)
+    {
+        let rest = &input[1..];
+        let ingr = lang.dictionary.ingredients.from_word(&input[0].word);
+        Ok((rest, ingr.clone()))
+    } else {
+        Err(nom::Err::Error((input, nom::error::ErrorKind::IsA)))
+    }
+}
+
 pub fn verb(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], PhraseNode> {
     if input.len() > 0 && input[0].role == Some(WordRole::Verb) {
         let rest = &input[1..];
         Ok((rest, PhraseNode::Verb(input[0].clone())))
+    } else {
+        Err(nom::Err::Error((input, nom::error::ErrorKind::IsA)))
+    }
+}
+pub fn verb_new(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], &AnnotatedWord> {
+    if input.len() > 0 && input[0].role == Some(WordRole::Verb) {
+        let rest = &input[1..];
+        Ok((rest, &input[0]))
     } else {
         Err(nom::Err::Error((input, nom::error::ErrorKind::IsA)))
     }
@@ -348,6 +389,21 @@ pub fn verb_phrase<'a>(
         }
         parts.push(v);
         PhraseNode::VerbPhrase(parts)
+    })(input)
+}
+
+/// VP -> (NP) V
+pub fn clause_new<'a>(
+    input: &'a [AnnotatedWord],
+    lang: &Language,
+) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
+    map(pair(|i| ingredient(i, lang), verb_new), |(np, v)| {
+        match v.definition() {
+            Some(WordFunction::Desire) => {
+                Box::new(ops::Add(np, ops::Relative::Top)) as Box<dyn Operation>
+            }
+            _ => todo!(),
+        }
     })(input)
 }
 

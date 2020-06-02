@@ -1,7 +1,11 @@
 mod allergy;
+pub mod ops;
+mod personality;
 
 // Re-export everything from behavior submodules.
 pub use allergy::*;
+pub use ops::*;
+pub use personality::*;
 
 use crate::{
     client::Language,
