@@ -35,13 +35,14 @@ struct Weights {
     adpositions: f64,
 }
 
-pub trait Operation {
+pub trait Operation: std::fmt::Debug {
     fn apply(&self, sandwich: Sandwich) -> Sandwich;
     fn reverse(&self) -> Box<dyn Operation>;
     fn encode(&self, lang: &Language) -> String;
 }
 
 /// Add an ingredient to a sandwich, at the very end or relative to another ingredient.
+#[derive(Debug)]
 pub struct Add(pub Ingredient, pub Relative);
 impl Operation for Add {
     fn apply(&self, sandwich: Sandwich) -> Sandwich {
@@ -90,6 +91,7 @@ impl Operation for Add {
     }
 }
 
+#[derive(Debug)]
 pub enum Relative {
     Before(Ingredient),
     After(Ingredient),
@@ -97,6 +99,7 @@ pub enum Relative {
 }
 
 /// Remove the given ingredient from a sandwich.
+#[derive(Debug)]
 pub struct Remove(Ingredient);
 impl Operation for Remove {
     fn apply(&self, sandwich: Sandwich) -> Sandwich {
@@ -165,6 +168,7 @@ impl Order {
             .rposition(|x| result.ingredients.contains(x));
         // We want to add the next one!
         let next_idx = last_shared.map(|i| i + 1).unwrap_or(0);
+        println!("next index we want: {}", next_idx);
 
         // There's a mistake if any preceding ingredients aren't in the result sandwich.
         // NOTE disregarding order for the moment.

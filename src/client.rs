@@ -71,6 +71,7 @@ impl Client {
     }
 
     async fn receives_msgs(mut stream: TcpStream, mut chan: Sender<Message>) -> anyhow::Result<()> {
+        println!("Receiving!");
         loop {
             chan.send(Message::recv(&mut stream).await?).await?;
         }
@@ -87,12 +88,12 @@ impl Client {
                 if let Some(sandwich) = msg.and_then(|m| m.sandwich) {
                     self.last_result = sandwich;
                 }
-            } else {
-                break;
             }
             // Send over the next operation!
             let op = order.pick_op(&self.last_result);
+            println!("op: {:?}", op);
             let s = op.encode(&self.lang);
+            println!("message: {}", s);
             self.say_phrase(&s, None).await?;
             let message = Message::new(Some(s), None);
             message.send(&mut stream).await?;
@@ -100,7 +101,6 @@ impl Client {
             // TODO Some machines may wait for responses before sending the next operation.
             task::sleep(Duration::from_millis(800)).await;
         }
-        recv_task.await?;
         Ok(())
     }
 
@@ -109,7 +109,9 @@ impl Client {
         loop {
             // TODO This machine might wait to receive multiple operations before applying them all at once.
             let msg = Message::recv(&mut stream).await?;
-            let op = self.parse(&msg.text.unwrap()).unwrap();
+            let op = self
+                .parse(&msg.text.unwrap())
+                .expect("Failed to parse phrase");
             take(&mut self.last_result, |s| op.apply(s));
             // Send the current sandwich status back over!
             let new_msg = Message::new(None, Some(self.last_result.clone()));
