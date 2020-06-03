@@ -183,7 +183,7 @@ pub fn annotate(phrase: Phrase, context: &Language) -> AnnotatedPhrase {
 
 pub fn sentence_new(input: &[u8], lang: &Language) -> Option<Box<dyn Operation>> {
     phrase(input).ok().and_then(|(_, parsed)| {
-        let tagged = annotate(parsed, lang);
+        let tagged = std::dbg!(annotate(std::dbg!(parsed), lang));
         if let Ok((_, op)) = clause_new(&tagged, lang) {
             Some(op)
         } else {
@@ -402,7 +402,7 @@ pub fn clause_new<'a>(
             Some(WordFunction::Desire) => {
                 Box::new(ops::Add(np, ops::Relative::Top)) as Box<dyn Operation>
             }
-            _ => todo!(),
+            _ => todo!("Verb other than 'Desire' used"),
         }
     })(input)
 }
