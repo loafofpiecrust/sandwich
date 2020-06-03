@@ -406,20 +406,26 @@ pub fn verb_phrase<'a>(
     })(input)
 }
 
+// TODO Add probability to understand negation.
 fn neg_p<'a>(
     input: &'a [AnnotatedWord],
     lang: &Language,
 ) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
-    map(
-        pair(
-            |i| word_with_def(i, WordFunction::Negation),
-            |i| clause_new(i, lang),
+    alt((
+        map(
+            pair(
+                |i| word_with_def(i, WordFunction::Negation),
+                |i| clause_new(i, lang),
+            ),
+            |(_neg, vp)| vp.reverse(),
         ),
-        |(_neg, vp)| vp.reverse(),
-    )(input)
+        |i| clause_new(i, lang),
+    ))(input)
 }
 
 /// VP -> (NP) V
+// TODO Add probability to understand preposition.
+// TODO Add preposition parsing!
 pub fn clause_new<'a>(
     input: &'a [AnnotatedWord],
     lang: &Language,
