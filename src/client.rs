@@ -109,6 +109,7 @@ impl Client {
         loop {
             // TODO This machine might wait to receive multiple operations before applying them all at once.
             let msg = Message::recv(&mut stream).await?;
+            std::dbg!(&msg);
             let op = self
                 .parse(&msg.text.unwrap())
                 .expect("Failed to parse phrase");

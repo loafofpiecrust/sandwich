@@ -234,7 +234,7 @@ impl Order {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
     pub text: Option<String>,
     pub sandwich: Option<Sandwich>,
@@ -248,7 +248,7 @@ impl Message {
     pub async fn recv(stream: &mut TcpStream) -> anyhow::Result<Self> {
         let mut buf = [0u8; Self::MAX_SIZE];
         stream.read(&mut buf).await?;
-        Ok(bincode::deserialize(&buf)?)
+        Ok(bincode::deserialize_from(&buf as &[u8])?)
     }
     pub async fn send(&self, stream: &mut TcpStream) -> anyhow::Result<()> {
         let mut buf = [0u8; Self::MAX_SIZE];
