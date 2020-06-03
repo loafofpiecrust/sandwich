@@ -386,6 +386,18 @@ fn word_with_def(
     Err(nom::Err::Error((input, nom::error::ErrorKind::IsA)))
 }
 
+pub fn word_with_role(
+    input: &[AnnotatedWord],
+    role: WordRole,
+) -> IResult<&[AnnotatedWord], &AnnotatedWord> {
+    if input.len() > 0 && input[0].role == Some(role) {
+        let rest = &input[1..];
+        Ok((rest, &input[0]))
+    } else {
+        Err(nom::Err::Error((input, nom::error::ErrorKind::IsA)))
+    }
+}
+
 /// NP -> N
 // pub fn noun_phrase(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], PhraseNode> {
 //     map(noun, |n| PhraseNode::NounPhrase(vec![n]))(input)
@@ -415,11 +427,34 @@ fn neg_p<'a>(
         map(
             pair(
                 |i| word_with_def(i, WordFunction::Negation),
-                |i| clause_new(i, lang),
+                |i| pos_p(i, lang),
             ),
             |(_neg, vp)| vp.reverse(),
         ),
-        |i| clause_new(i, lang),
+        |i| pos_p(i, lang),
+    ))(input)
+}
+
+fn adposition<'a>(
+    input: &'a [AnnotatedWord],
+    lang: &Language,
+) -> IResult<&'a [AnnotatedWord], ops::Relative> {
+    map(
+        pair(
+            |i| ingredient(i, lang),
+            |i| word_with_role(i, WordRole::Preposition),
+        ),
+        |(ingr, pos)| ops::Relative::from_def(pos.entry.as_ref().unwrap().function, ingr),
+    )(input)
+}
+
+fn pos_p<'a>(
+    input: &'a [AnnotatedWord],
+    lang: &Language,
+) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
+    alt((
+        |i| adposition(i, lang).and_then(|(i, r)| clause_new(i, &r, lang)),
+        |i| clause_new(i, &ops::Relative::Top, &lang),
     ))(input)
 }
 
@@ -428,13 +463,12 @@ fn neg_p<'a>(
 // TODO Add preposition parsing!
 pub fn clause_new<'a>(
     input: &'a [AnnotatedWord],
+    pos: &ops::Relative,
     lang: &Language,
 ) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
     map(pair(|i| ingredient(i, lang), verb_new), |(np, v)| {
         match v.definition() {
-            Some(WordFunction::Desire) => {
-                Box::new(ops::Add(np, ops::Relative::Top)) as Box<dyn Operation>
-            }
+            Some(WordFunction::Desire) => Box::new(ops::Add(np, pos.clone())) as Box<dyn Operation>,
             _ => todo!("Verb other than 'Desire' used"),
         }
     })(input)

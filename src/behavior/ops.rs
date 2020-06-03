@@ -30,6 +30,7 @@ use async_std::prelude::*;
 use bincode::deserialize;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::convert::From;
 
 struct Weights {
     adpositions: f64,
@@ -91,11 +92,20 @@ impl Operation for Add {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Relative {
     Before(Ingredient),
     After(Ingredient),
     Top,
+}
+impl Relative {
+    pub fn from_def(def: WordFunction, ingredient: Ingredient) -> Self {
+        match def {
+            WordFunction::Before => Relative::Before(ingredient),
+            WordFunction::After => Relative::After(ingredient),
+            _ => Relative::Top,
+        }
+    }
 }
 
 /// Remove the given ingredient from a sandwich.
