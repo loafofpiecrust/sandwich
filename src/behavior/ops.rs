@@ -80,7 +80,7 @@ impl Operation for Add {
                 let n = lang.dictionary.ingredients.to_word(&other, String::new());
                 format!("{} {} ", n.unwrap(), p.0)
             }
-            Relative::Top => " ".into(),
+            Relative::Top => String::new(),
         };
 
         // Get the word for our verb and ingredient.
@@ -121,6 +121,21 @@ impl Operation for Remove {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct Finish;
+impl Operation for Finish {
+    fn apply(&self, sandwich: Sandwich) -> Sandwich {
+        sandwich
+    }
+    fn reverse(&self) -> Box<dyn Operation> {
+        Box::new(self.clone())
+    }
+    fn encode(&self, lang: &Language) -> String {
+        let bye = lang.dictionary.first_word_in_class(WordFunction::Greeting);
+        bye.0.into()
+    }
+}
+
 // pub struct Negate(Box<dyn Operation>);
 // impl Operation for Negate {
 //     fn apply(self, sandwich: Sandwich) -> Sandwich {
@@ -157,7 +172,7 @@ impl Order {
             }],
         }
     }
-    pub fn pick_op(&mut self, result: &Sandwich) -> Box<dyn Operation> {
+    pub fn pick_op(&mut self, result: &Sandwich) -> Option<Box<dyn Operation>> {
         let mut rng = thread_rng();
         // The basic behavior: pick the next ingredient on the sandwich.
         // Find the top-most shared ingredient between desired and result.
@@ -206,7 +221,7 @@ impl Order {
                 before.map(|b| Relative::After(b.clone()))
             }
             .unwrap_or(Relative::Top);
-            return Box::new(Add(self.desired.ingredients[idx].clone(), rel));
+            return Some(Box::new(Add(self.desired.ingredients[idx].clone(), rel)));
         }
 
         // Check for allergens in the result sandwich.
@@ -222,15 +237,25 @@ impl Order {
             // If the allergy is severe and we aren't shy about it, ask for that
             // ingredient to be removed.
             if rng.gen_bool(allergen.severity) && !rng.gen_bool(self.personality.shyness) {
-                return Box::new(Remove(allergen.ingredient.clone()));
+                return Some(Box::new(Remove(allergen.ingredient.clone())));
             }
         }
 
+        // If the result has all the ingredients we want, then we're finished.
+        let has_all = self
+            .desired
+            .ingredients
+            .iter()
+            .all(|x| result.ingredients.contains(x));
+        if has_all {
+            return None;
+        }
+
         // Default behavior, just add the next ingredient to the top of the sandwich.
-        Box::new(Add(
+        Some(Box::new(Add(
             self.desired.ingredients[next_idx].clone(),
             Relative::Top,
-        ))
+        )))
     }
 }
 

@@ -184,7 +184,7 @@ pub fn annotate(phrase: Phrase, context: &Language) -> AnnotatedPhrase {
 pub fn sentence_new(input: &[u8], lang: &Language) -> Option<Box<dyn Operation>> {
     phrase(input).ok().and_then(|(_, parsed)| {
         let tagged = std::dbg!(annotate(std::dbg!(parsed), lang));
-        if let Ok((_, op)) = clause_new(&tagged, lang) {
+        if let Ok((_, op)) = neg_p(&tagged, lang) {
             Some(op)
         } else {
             // Try again with unknown words removed.
@@ -192,7 +192,7 @@ pub fn sentence_new(input: &[u8], lang: &Language) -> Option<Box<dyn Operation>>
                 .into_iter()
                 .filter(|x| x.role.is_some() || x.entry.is_some())
                 .collect_vec();
-            let c = clause_new(&nt, lang);
+            let c = neg_p(&nt, lang);
             c.ok().map(|(_, t)| t)
         }
     })
@@ -372,6 +372,20 @@ pub fn verb_new(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], &Annotated
     }
 }
 
+fn word_with_def(
+    input: &[AnnotatedWord],
+    def: WordFunction,
+) -> IResult<&[AnnotatedWord], &AnnotatedWord> {
+    if let Some(d) = input
+        .get(0)
+        .and_then(|i| i.entry.as_ref())
+        .map(|e| e.function)
+    {
+        return Ok((&input[1..], &input[0]));
+    }
+    Err(nom::Err::Error((input, nom::error::ErrorKind::IsA)))
+}
+
 /// NP -> N
 // pub fn noun_phrase(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], PhraseNode> {
 //     map(noun, |n| PhraseNode::NounPhrase(vec![n]))(input)
@@ -390,6 +404,19 @@ pub fn verb_phrase<'a>(
         parts.push(v);
         PhraseNode::VerbPhrase(parts)
     })(input)
+}
+
+fn neg_p<'a>(
+    input: &'a [AnnotatedWord],
+    lang: &Language,
+) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
+    map(
+        pair(
+            |i| word_with_def(i, WordFunction::Negation),
+            |i| clause_new(i, lang),
+        ),
+        |(_neg, vp)| vp.reverse(),
+    )(input)
 }
 
 /// VP -> (NP) V
