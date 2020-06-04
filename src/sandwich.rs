@@ -129,7 +129,8 @@ impl Sandwich {
         ingredients.extend(
             (0..)
                 .map(|_| all_ingredients.random().clone())
-                .unique()
+                // 20% chance for an ingredient to duplicate.
+                .unique_by(|x| format!("{}{}", x.name, thread_rng().gen_bool(0.8)))
                 .take(len),
         );
         ingredients.push(top.clone());

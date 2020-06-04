@@ -218,8 +218,13 @@ impl Order {
             .iter()
             .rposition(|x| result.ingredients.contains(x));
         // We want to add the next one!
-        let next_idx = last_shared.map(|i| i + 1).unwrap_or(0);
+        let mut next_idx = last_shared.map(|i| i + 1).unwrap_or(0);
         println!("next index we want: {}", next_idx);
+
+        // Maybe forget this ingredient and move on to the next one.
+        if rng.gen_bool(self.personality.forgetfulness) {
+            next_idx += 1;
+        }
 
         // There's a mistake if any preceding ingredients aren't in the result sandwich.
         // NOTE disregarding order for the moment.

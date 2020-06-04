@@ -17,7 +17,7 @@ impl Personality {
     pub fn new() -> Self {
         Self {
             laziness: 0.5,
-            forgetfulness: 0.5,
+            forgetfulness: 0.1,
             politeness: 0.5,
             shyness: 0.1,
             spite: 0.0,
