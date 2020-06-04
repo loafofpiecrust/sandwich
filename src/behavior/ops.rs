@@ -283,30 +283,27 @@ impl Order {
         }
 
         // If there are multiple of the ingredient we want, ask for them all at once.
-        let next_ingr = &self.desired.ingredients[next_idx];
-        // Number of the ingredient we want in a row
-        // TODO Check the whole list of remaining ingredients if order doesn't
-        // matter to this machine.
-        let same_count = self
-            .desired
-            .ingredients
-            .iter()
-            .skip(next_idx) // If we want index 1, skip just the zero-th.
-            .take_while(|x| x == &next_ingr)
-            .count();
-        if same_count > 1 {
-            // TODO Wrap an existing Add op.
-            return Some(Box::new(Multiple(
-                same_count as u32,
-                Box::new(Add(next_ingr.clone(), Relative::Top)),
-            )));
-        }
-
-        // Default behavior, just add the next ingredient to the top of the sandwich.
-        Some(Box::new(Add(
-            self.desired.ingredients[next_idx].clone(),
-            Relative::Top,
-        )))
+        let next_ingr = self.desired.ingredients.get(next_idx);
+        next_ingr.map(|next_ingr| {
+            // Number of the ingredient we want in a row
+            // TODO Check the whole list of remaining ingredients if order doesn't
+            // matter to this machine.
+            let adder = Box::new(Add(next_ingr.clone(), Relative::Top));
+            let same_count = self
+                .desired
+                .ingredients
+                .iter()
+                .skip(next_idx) // If we want index 1, skip just the zero-th.
+                .take_while(|x| x == &next_ingr)
+                .count();
+            if same_count > 1 {
+                // TODO Wrap an existing Add op.
+                Box::new(Multiple(same_count as u32, adder)) as Box<dyn Operation>
+            } else {
+                // Default behavior, just add the next ingredient to the top of the sandwich.
+                adder as Box<dyn Operation>
+            }
+        })
     }
 }
 
