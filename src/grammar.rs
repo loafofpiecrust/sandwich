@@ -65,6 +65,8 @@ pub enum WordFunction {
     Desire,
     After,
     Before,
+    /// Please and thank you.
+    Polite,
     // Lexical Functions
     Sandwich,
     /// Has some meaning beyond function.
@@ -184,7 +186,7 @@ pub fn annotate(phrase: Phrase, context: &Language) -> AnnotatedPhrase {
 pub fn sentence_new(input: &[u8], lang: &Language) -> Option<Box<dyn Operation>> {
     phrase(input).ok().and_then(|(_, parsed)| {
         let tagged = std::dbg!(annotate(std::dbg!(parsed), lang));
-        if let Ok((_, op)) = neg_p(&tagged, lang) {
+        if let Ok((_, op)) = sentence(&tagged, lang) {
             Some(op)
         } else {
             // Try again with unknown words removed.
@@ -192,30 +194,10 @@ pub fn sentence_new(input: &[u8], lang: &Language) -> Option<Box<dyn Operation>>
                 .into_iter()
                 .filter(|x| x.role.is_some() || x.entry.is_some())
                 .collect_vec();
-            let c = neg_p(&nt, lang);
+            let c = sentence(&nt, lang);
             c.ok().map(|(_, t)| t)
         }
     })
-}
-
-pub fn sentence(input: &[u8], lang: &Language, encoder: &dyn Encoder) -> Option<PhraseNode> {
-    if let Ok((_, parsed)) = phrase(input) {
-        let tagged = annotate(parsed, lang);
-        if let Ok((_, tree)) = clause(&tagged, encoder) {
-            // std::dbg!(&tree);
-            Some(tree)
-        } else {
-            // Try again with unknown words removed.
-            let nt = tagged
-                .into_iter()
-                .filter(|x| x.role.is_some() || x.entry.is_some())
-                .collect_vec();
-            let c = clause(&nt, encoder);
-            c.ok().map(|(_, t)| t)
-        }
-    } else {
-        None
-    }
 }
 
 #[derive(Debug)]
@@ -344,32 +326,10 @@ fn ingredient<'a>(
     input: &'a [AnnotatedWord],
     lang: &Language,
 ) -> IResult<&'a [AnnotatedWord], Ingredient> {
-    if input.len() > 0 && input[0].role == Some(WordRole::Noun)
-    // && input[0].function == Some(WordFunction::Ingredient)
-    {
-        let rest = &input[1..];
-        let ingr = lang.dictionary.ingredients.from_word(&input[0].word);
-        Ok((rest, ingr.clone()))
-    } else {
-        Err(nom::Err::Error((input, nom::error::ErrorKind::IsA)))
-    }
-}
-
-pub fn verb(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], PhraseNode> {
-    if input.len() > 0 && input[0].role == Some(WordRole::Verb) {
-        let rest = &input[1..];
-        Ok((rest, PhraseNode::Verb(input[0].clone())))
-    } else {
-        Err(nom::Err::Error((input, nom::error::ErrorKind::IsA)))
-    }
-}
-pub fn verb_new(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], &AnnotatedWord> {
-    if input.len() > 0 && input[0].role == Some(WordRole::Verb) {
-        let rest = &input[1..];
-        Ok((rest, &input[0]))
-    } else {
-        Err(nom::Err::Error((input, nom::error::ErrorKind::IsA)))
-    }
+    map(
+        |i| word_with_def(i, WordFunction::Ingredient),
+        |w| lang.dictionary.ingredients.from_word(&w.word).clone(),
+    )(input)
 }
 
 fn word_with_def(
@@ -396,26 +356,6 @@ pub fn word_with_role(
     } else {
         Err(nom::Err::Error((input, nom::error::ErrorKind::IsA)))
     }
-}
-
-/// NP -> N
-// pub fn noun_phrase(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], PhraseNode> {
-//     map(noun, |n| PhraseNode::NounPhrase(vec![n]))(input)
-// }
-
-/// VP -> (NP) V
-pub fn verb_phrase<'a>(
-    input: &'a [AnnotatedWord],
-    encoder: &dyn Encoder,
-) -> IResult<&'a [AnnotatedWord], PhraseNode> {
-    map(pair(opt(|i| encoder.noun_phrase(i)), verb), |(np, v)| {
-        let mut parts = Vec::new();
-        if let Some(np) = np {
-            parts.push(np);
-        }
-        parts.push(v);
-        PhraseNode::VerbPhrase(parts)
-    })(input)
 }
 
 // TODO Add probability to understand negation.
@@ -458,37 +398,35 @@ fn pos_p<'a>(
     ))(input)
 }
 
+fn greeting<'a>(input: &'a [AnnotatedWord]) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
+    map(
+        |i| word_with_def(i, WordFunction::Greeting),
+        |_| Box::new(ops::Finish) as Box<dyn Operation>,
+    )(input)
+}
+
+fn sentence<'a>(
+    input: &'a [AnnotatedWord],
+    lang: &Language,
+) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
+    alt((|i| neg_p(i, lang), greeting))(input)
+}
+
 /// VP -> (NP) V
 // TODO Add probability to understand preposition.
-// TODO Add preposition parsing!
 pub fn clause_new<'a>(
     input: &'a [AnnotatedWord],
     pos: &ops::Relative,
     lang: &Language,
 ) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
-    map(pair(|i| ingredient(i, lang), verb_new), |(np, v)| {
-        match v.definition() {
+    map(
+        pair(
+            |i| ingredient(i, lang),
+            |i| word_with_role(i, WordRole::Verb),
+        ),
+        |(np, v)| match v.definition() {
             Some(WordFunction::Desire) => Box::new(ops::Add(np, pos.clone())) as Box<dyn Operation>,
             _ => todo!("Verb other than 'Desire' used"),
-        }
-    })(input)
-}
-
-/// CP -> NP VP
-pub fn clause<'a>(
-    input: &'a [AnnotatedWord],
-    encoder: &dyn Encoder,
-) -> IResult<&'a [AnnotatedWord], PhraseNode> {
-    alt((
-        // We use different branches here instead of an optional subject because nom
-        // consumes from the left, and we don't want to misidentify an OV sentence as SV.
-        map(
-            |i| verb_phrase(i, encoder),
-            |vp| PhraseNode::ClausalPhrase(vec![vp]),
-        ),
-        map(
-            pair(|i| encoder.noun_phrase(i), |i| verb_phrase(i, encoder)),
-            |(np, vp)| PhraseNode::ClausalPhrase(vec![np, vp]),
-        ),
-    ))(input)
+        },
+    )(input)
 }

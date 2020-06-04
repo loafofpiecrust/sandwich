@@ -30,3 +30,7 @@ ku:
   role: Noun
   function: Sandwich
   definition: "sandwich"
+loti:
+  role: Special
+  function: Polite
+  definition: "please/thank you"

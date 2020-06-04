@@ -1,6 +1,6 @@
 use crate::{
     audio,
-    behavior::{Behavior, DesireEncoder, Encoder, Message, Operation, Order, RelativeEncoder},
+    behavior::{ops, Behavior, DesireEncoder, Encoder, Message, Operation, Order, RelativeEncoder},
     comm,
     display::{setup_display, Render, RenderSender},
     grammar,
@@ -20,7 +20,7 @@ use futures::sink::SinkExt;
 use take_mut::take;
 // use futures::prelude::*;
 use futures::{pin_mut, select, FutureExt};
-use grammar::{sentence, sentence_new, Dictionary, PhraseNode};
+use grammar::{sentence_new, Dictionary, PhraseNode};
 use std::{thread, time::Duration};
 
 pub struct Language {
@@ -85,6 +85,7 @@ impl Client {
         loop {
             // TODO Handle the Err case here by breaking the loop.
             if let Ok(msg) = msg_rx.try_next() {
+                println!("received {:?}", msg);
                 if let Some(sandwich) = msg.and_then(|m| m.sandwich) {
                     self.last_result = sandwich;
                 }
@@ -103,11 +104,30 @@ impl Client {
                 task::sleep(Duration::from_millis(800)).await;
             } else {
                 // Break the loop if there's no more operations to make!
+                println!("the sandwich is finished!");
                 break;
             }
         }
+        // Say thank you and goodbye.
+        let op = ops::Finish;
+        let s = op.encode(&self.lang);
+        self.say_phrase(&s, None).await?;
+        let msg = Message::new(Some(s), None);
+        msg.send(&mut stream).await?;
         Ok(())
     }
+
+    // async fn say_and_send(
+    //     &self,
+    //     op: Box<dyn Operation>,
+    //     stream: &mut TcpStream,
+    // ) -> anyhow::Result<()> {
+    //     let s = op.encode(&self.lang);
+    //     self.say_phrase(&s, None);
+    //     let msg = Message::new(Some(s), None);
+    //     msg.send(&mut stream).await?;
+    //     Ok(())
+    // }
 
     async fn new_server(&mut self, mut stream: TcpStream) -> anyhow::Result<()> {
         self.last_result = Sandwich::default();
