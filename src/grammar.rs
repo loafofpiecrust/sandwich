@@ -40,6 +40,15 @@ impl Dictionary {
         }
         unreachable!("There should be at least one word per function.")
     }
+    pub fn word_for_num(&self, number: u32) -> (&str, &DictionaryEntry) {
+        let num_str = number.to_string();
+        for (word, entry) in &self.words {
+            if entry.function == WordFunction::Number && entry.definition == num_str {
+                return (word, entry);
+            }
+        }
+        todo!("There is no word for number {}", number)
+    }
     pub fn get(&self, word: &str) -> Option<&DictionaryEntry> {
         self.words.get(word)
     }
@@ -69,6 +78,7 @@ pub enum WordFunction {
     Polite,
     // Lexical Functions
     Sandwich,
+    Number,
     /// Has some meaning beyond function.
     Ingredient,
 }
@@ -85,6 +95,7 @@ pub enum WordRole {
     Verb,
     /// Ingredients and pronouns
     Noun,
+    Adjective,
     /// *Between* x and y
     Preposition,
     /// x *and* y
@@ -388,6 +399,25 @@ fn adposition<'a>(
     )(input)
 }
 
+fn number(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], u32> {
+    map_res(
+        |i| word_with_def(i, WordFunction::Number),
+        |w| w.entry.as_ref().unwrap().definition.parse::<u32>(),
+    )(input)
+}
+
+fn numbered_p<'a>(
+    input: &'a [AnnotatedWord],
+    lang: &Language,
+) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
+    alt((
+        map(pair(number, |i| neg_p(i, lang)), |(n, vp)| {
+            Box::new(ops::Multiple(n, vp)) as Box<dyn Operation>
+        }),
+        |i| neg_p(i, lang),
+    ))(input)
+}
+
 fn pos_p<'a>(
     input: &'a [AnnotatedWord],
     lang: &Language,
@@ -409,7 +439,7 @@ fn sentence<'a>(
     input: &'a [AnnotatedWord],
     lang: &Language,
 ) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
-    alt((|i| neg_p(i, lang), greeting))(input)
+    alt((|i| numbered_p(i, lang), greeting))(input)
 }
 
 /// VP -> (NP) V

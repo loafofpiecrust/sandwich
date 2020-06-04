@@ -1,3 +1,4 @@
+use crate::sandwich::Ingredient;
 pub struct Personality {
     /// Likeliness to make mistakes building an order, to fail to remove allergens.
     pub laziness: f64,

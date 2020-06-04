@@ -34,3 +34,23 @@ loti:
   role: Special
   function: Polite
   definition: "please/thank you"
+po:
+  role: Adjective
+  function: Number
+  definition: "1"
+to:
+  role: Adjective
+  function: Number
+  definition: "2"
+ko:
+  role: Adjective
+  function: Number
+  definition: "3"
+ho:
+  role: Adjective
+  function: Number
+  definition: "4"
+mo:
+  role: Adjective
+  function: Number
+  definition: "5"

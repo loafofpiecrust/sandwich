@@ -27,14 +27,8 @@ use crate::{
 };
 use async_std::net::TcpStream;
 use async_std::prelude::*;
-use bincode::deserialize;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::convert::From;
-
-struct Weights {
-    adpositions: f64,
-}
 
 pub trait Operation: std::fmt::Debug {
     fn apply(&self, sandwich: Sandwich) -> Sandwich;
@@ -146,6 +140,25 @@ impl Operation for Finish {
     fn encode(&self, lang: &Language) -> String {
         let bye = lang.dictionary.first_word_in_class(WordFunction::Greeting);
         bye.0.into()
+    }
+}
+
+#[derive(Debug)]
+pub struct Multiple(pub u32, pub Box<dyn Operation>);
+impl Operation for Multiple {
+    fn apply(&self, sandwich: Sandwich) -> Sandwich {
+        let mut sandwich = sandwich;
+        for _ in 0..self.0 {
+            sandwich = self.1.apply(sandwich);
+        }
+        sandwich
+    }
+    fn reverse(&self) -> Box<dyn Operation> {
+        Box::new(Self(self.0, self.1.reverse()))
+    }
+    fn encode(&self, lang: &Language) -> String {
+        let num = lang.dictionary.word_for_num(self.0);
+        format!("{} {}", num.0, self.1.encode(lang))
     }
 }
 
