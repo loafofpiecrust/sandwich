@@ -199,6 +199,16 @@ impl Order {
         }
     }
     pub fn pick_op(&mut self, result: &Sandwich) -> Option<Box<dyn Operation>> {
+        // If the result has all the ingredients we want, then we're finished.
+        let has_all = self
+            .desired
+            .ingredients
+            .iter()
+            .all(|x| result.ingredients.contains(x));
+        if has_all {
+            return None;
+        }
+
         let mut rng = thread_rng();
         // The basic behavior: pick the next ingredient on the sandwich.
         // Find the top-most shared ingredient between desired and result.
@@ -267,14 +277,24 @@ impl Order {
             }
         }
 
-        // If the result has all the ingredients we want, then we're finished.
-        let has_all = self
+        // If there are multiple of the ingredient we want, ask for them all at once.
+        let next_ingr = &self.desired.ingredients[next_idx];
+        // Number of the ingredient we want in a row
+        // TODO Check the whole list of remaining ingredients if order doesn't
+        // matter to this machine.
+        let same_count = self
             .desired
             .ingredients
             .iter()
-            .all(|x| result.ingredients.contains(x));
-        if has_all {
-            return None;
+            .skip(next_idx) // If we want index 1, skip just the zero-th.
+            .take_while(|x| x == &next_ingr)
+            .count();
+        if same_count > 1 {
+            // TODO Wrap an existing Add op.
+            return Some(Box::new(Multiple(
+                same_count as u32,
+                Box::new(Add(next_ingr.clone(), Relative::Top)),
+            )));
         }
 
         // Default behavior, just add the next ingredient to the top of the sandwich.
