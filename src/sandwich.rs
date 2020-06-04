@@ -112,10 +112,14 @@ impl Ingredient {
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Sandwich {
     pub ingredients: Vec<Ingredient>,
+    pub complete: bool,
 }
 impl Sandwich {
     pub fn new(ingredients: Vec<Ingredient>) -> Self {
-        Self { ingredients }
+        Self {
+            ingredients,
+            complete: false,
+        }
     }
     pub fn random(all_ingredients: &Ingredient, len: usize) -> Self {
         // Pick a base first, then the inside ingredients.
@@ -129,7 +133,10 @@ impl Sandwich {
                 .take(len),
         );
         ingredients.push(top.clone());
-        Self { ingredients }
+        Self {
+            ingredients,
+            complete: true,
+        }
     }
     pub fn to_words(&self, dictionary: &Dictionary) -> Vec<String> {
         self.ingredients

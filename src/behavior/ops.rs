@@ -135,7 +135,10 @@ impl Operation for Remove {
 pub struct Finish;
 impl Operation for Finish {
     fn apply(&self, sandwich: Sandwich) -> Sandwich {
-        sandwich
+        Sandwich {
+            complete: true,
+            ..sandwich
+        }
     }
     fn reverse(&self) -> Box<dyn Operation> {
         Box::new(self.clone())

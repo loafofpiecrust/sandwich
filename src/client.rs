@@ -139,10 +139,19 @@ impl Client {
                 .parse(&msg.text.unwrap())
                 .expect("Failed to parse phrase");
             take(&mut self.last_result, |s| op.apply(s));
+
+            // Only break the loop when the order is complete.
+            if self.last_result.complete {
+                break;
+            }
+
             // Send the current sandwich status back over!
             let new_msg = Message::new(None, Some(self.last_result.clone()));
             new_msg.send(&mut stream).await?;
         }
+
+        println!("The order is finished!");
+        Ok(())
     }
 
     async fn server(&mut self, mut stream: TcpStream) -> anyhow::Result<()> {
