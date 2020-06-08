@@ -55,6 +55,7 @@ impl Operation for Add {
         if let Some(idx) = idx {
             ingr.insert(idx, self.0.clone());
         }
+        personality.spite += 0.05;
         Sandwich {
             ingredients: ingr,
             ..sandwich
@@ -273,9 +274,18 @@ impl Order {
             .desired
             .ingredients
             .iter()
-            .rposition(|x| result.ingredients.contains(x));
+            .enumerate()
+            // Mostly filter out allergens.
+            .filter(|(idx, x)| {
+                !self
+                    .personality
+                    .allergies
+                    .iter()
+                    .any(|a| &a.ingredient == *x && rng.gen_bool(a.severity))
+            })
+            .rfind(|(idx, x)| result.ingredients.contains(x));
         // We want to add the next one!
-        let mut next_idx = last_shared.map(|i| i + 1).unwrap_or(0);
+        let mut next_idx = last_shared.map(|(i, _)| i + 1).unwrap_or(0);
         println!("next index we want: {}", next_idx);
 
         // Maybe forget this ingredient and move on to the next one.
