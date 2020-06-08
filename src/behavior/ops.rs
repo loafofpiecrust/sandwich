@@ -33,7 +33,7 @@ use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 
 pub trait Operation: std::fmt::Debug {
-    fn apply(&self, sandwich: Sandwich) -> Sandwich;
+    fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich;
     fn reverse(&self) -> Box<dyn Operation>;
     fn encode(&self, lang: &Language) -> String;
 }
@@ -42,7 +42,7 @@ pub trait Operation: std::fmt::Debug {
 #[derive(Debug)]
 pub struct Add(pub Ingredient, pub Relative);
 impl Operation for Add {
-    fn apply(&self, sandwich: Sandwich) -> Sandwich {
+    fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
         let mut ingr = sandwich.ingredients;
         let idx = match &self.1 {
             Relative::Before(other) => ingr.iter().position(|x| x.name == other.name),
@@ -108,11 +108,13 @@ impl Relative {
 #[derive(Debug)]
 pub struct Remove(Ingredient);
 impl Operation for Remove {
-    fn apply(&self, sandwich: Sandwich) -> Sandwich {
+    fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
         let mut ingredients = sandwich.ingredients;
         if let Some(idx) = ingredients.iter().position(|x| x.name == self.0.name) {
             ingredients.remove(idx);
         }
+        // Ingredient removal raises spite!
+        personality.spite += 0.1;
         Sandwich {
             ingredients,
             ..sandwich
@@ -130,7 +132,7 @@ impl Operation for Remove {
 #[derive(Debug, Clone)]
 pub struct Finish;
 impl Operation for Finish {
-    fn apply(&self, sandwich: Sandwich) -> Sandwich {
+    fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
         Sandwich {
             complete: true,
             ..sandwich
@@ -149,10 +151,10 @@ impl Operation for Finish {
 #[derive(Debug)]
 pub struct Repeat(pub u32, pub Box<dyn Operation>);
 impl Operation for Repeat {
-    fn apply(&self, sandwich: Sandwich) -> Sandwich {
+    fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
         let mut sandwich = sandwich;
         for _ in 0..self.0 {
-            sandwich = self.1.apply(sandwich);
+            sandwich = self.1.apply(sandwich, personality);
         }
         sandwich
     }
@@ -169,9 +171,10 @@ impl Operation for Repeat {
 #[derive(Debug)]
 pub struct Compound(pub Box<dyn Operation>, pub Box<dyn Operation>);
 impl Operation for Compound {
-    fn apply(&self, sandwich: Sandwich) -> Sandwich {
+    fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
         // Apply the inner operations sequentially.
-        self.1.apply(self.0.apply(sandwich))
+        self.1
+            .apply(self.0.apply(sandwich, personality), personality)
     }
     // TODO This could also just reverse the order of it?
     fn reverse(&self) -> Box<dyn Operation> {
@@ -189,13 +192,17 @@ impl Operation for Compound {
 #[derive(Debug)]
 pub struct NeverAdd(pub Ingredient);
 impl Operation for NeverAdd {
-    fn apply(&self, sandwich: Sandwich) -> Sandwich {
+    fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
         todo!()
     }
     fn reverse(&self) -> Box<dyn Operation> {
         todo!()
     }
     fn encode(&self, lang: &Language) -> String {
+        // adjective: "I am allgergic to X"
+        // or noun: "X is an allergy"
+        // or verb: "I react to X"
+        // or reverse verb: "X causes reaction"
         todo!()
     }
 }
@@ -241,7 +248,7 @@ impl Order {
             history: Vec::new(),
             personality: Personality::new(lang),
             // TODO Pick a sandwich based on our personality.
-            desired: Sandwich::random(&lang.dictionary.ingredients, 5),
+            desired: Sandwich::random(&lang.dictionary.ingredients, 7),
         }
     }
 

@@ -1,6 +1,9 @@
 use crate::{
     audio,
-    behavior::{ops, Behavior, DesireEncoder, Encoder, Message, Operation, Order, RelativeEncoder},
+    behavior::{
+        ops, Behavior, DesireEncoder, Encoder, Message, Operation, Order, Personality,
+        RelativeEncoder,
+    },
     comm,
     display::{setup_display, Render, RenderSender},
     grammar,
@@ -150,6 +153,8 @@ impl Client {
         mut stream: TcpStream,
         color: &'static str,
     ) -> anyhow::Result<()> {
+        let mut rng = thread_rng();
+
         // Set the shared background color.
         self.lang.render(Render {
             ingredients: None,
@@ -157,17 +162,27 @@ impl Client {
             background: Some(color),
         })?;
 
+        let mut personality = Personality::new(&self.lang);
         self.last_result = Sandwich::default();
         loop {
             // TODO This machine might wait to receive multiple operations before applying them all at once.
             let msg = Message::recv(&mut stream).await?;
             std::dbg!(&msg);
-            let op = self
+            let mut op = self
                 .parse(&msg.text.unwrap())
                 .expect("Failed to parse phrase");
-            take(&mut self.last_result, |s| op.apply(s));
 
-            // TODO Render upon saying a response?
+            // If spite is high enough, do the opposite of their order.
+            if rng.gen_bool(personality.spite) {
+                op = op.reverse();
+                // Feel the release of anger calm you.
+                personality.spite = 0.0;
+            }
+
+            // Apply the operation to our sandwich.
+            take(&mut self.last_result, |s| op.apply(s, &mut personality));
+
+            // TODO Say response too? Render upon saying a response?
             self.lang.render(Render {
                 subtitles: None,
                 ingredients: Some(self.last_result.ingredients.clone()),

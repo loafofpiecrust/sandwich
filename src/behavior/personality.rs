@@ -26,13 +26,15 @@ impl Personality {
             shyness: 0.1,
             spite: 0.0,
             order_sensitivity: 1.0,
-            spontaneity: 0.05,
+            spontaneity: 0.1,
             allergies: vec![Allergy {
-                severity: 0.5,
+                severity: 0.6,
                 ingredient: lang.dictionary.ingredients.random().clone(),
             }],
-            // TODO Generate some favorites!
-            favorites: Vec::new(),
+            favorites: vec![Allergy {
+                severity: 0.8,
+                ingredient: lang.dictionary.ingredients.random().clone(),
+            }],
         }
     }
 }
