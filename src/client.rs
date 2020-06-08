@@ -111,8 +111,10 @@ impl Client {
                 let message = Message::new(Some(s), None);
                 message.send(&mut stream).await?;
                 // Wait some time between each of our requests.
-                // TODO Some machines may wait for responses before sending the next operation.
-                task::sleep(Duration::from_millis(800)).await;
+                // TODO Some machines may wait for responses before sending the
+                // next operation. Or start waiting if there's a buffer of
+                // messages that haven't been acknowledged.
+                task::sleep(Duration::from_millis(1000)).await;
             } else {
                 // Break the loop if there's no more operations to make!
                 println!("the sandwich is finished!");
