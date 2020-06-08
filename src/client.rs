@@ -112,7 +112,8 @@ impl Client {
             let mut op = order.pick_op(&self.last_result);
 
             if let Some(mut op) = op {
-                if !rng.gen_bool(order.personality.forgetfulness)
+                // Request two operations at once if planned and not shy.
+                if rng.gen_bool(order.personality.planned)
                     && !rng.gen_bool(order.personality.shyness)
                 {
                     let assumed_sandwich =

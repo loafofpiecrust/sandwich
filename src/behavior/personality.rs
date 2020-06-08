@@ -12,6 +12,7 @@ pub struct Personality {
     /// Others being polite lowers your spite, non-polite interactions raise spite.
     /// Once you reach a high spite threshold, mess up orders on purpose.
     pub spite: f64,
+    pub planned: f64,
     pub spontaneity: f64,
     pub order_sensitivity: f64,
     pub allergies: Vec<Allergy>,
@@ -20,10 +21,11 @@ pub struct Personality {
 impl Personality {
     pub fn new(lang: &Language) -> Self {
         Self {
+            planned: 0.3,
             laziness: 0.5,
             forgetfulness: 0.1,
             politeness: 0.5,
-            shyness: 0.1,
+            shyness: 0.2,
             spite: 0.0,
             order_sensitivity: 1.0,
             spontaneity: 0.1,
