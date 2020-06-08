@@ -34,6 +34,10 @@ loti:
   role: Special
   function: Polite
   definition: "please/thank you"
+suho:
+  function: And
+  role: Conjunction
+  definition: "and"
 po:
   role: Adjective
   function: Number

@@ -377,6 +377,7 @@ impl Order {
         }
 
         // If there are multiple of the ingredient we want, ask for them all at once.
+
         let next_ingr = self.desired.ingredients.get(next_idx);
         next_ingr.map(|next_ingr| {
             // Number of the ingredient we want in a row
@@ -393,6 +394,19 @@ impl Order {
             if same_count > 1 {
                 Box::new(Repeat(same_count as u32, adder)) as Box<dyn Operation>
             } else {
+                // If your memory is good and you aren't shy, ask for two ingredients at once.
+                let another_one = self.desired.ingredients.get(next_idx + 1);
+                if let Some(another_one) = another_one {
+                    if !rng.gen_bool(self.personality.forgetfulness)
+                        && !rng.gen_bool(self.personality.shyness)
+                    {
+                        return Box::new(Compound(
+                            adder,
+                            Box::new(Add(another_one.clone(), Relative::Top)),
+                        )) as Box<dyn Operation>;
+                    }
+                }
+
                 // Default behavior, just add the next ingredient to the top of the sandwich.
                 adder as Box<dyn Operation>
             }
