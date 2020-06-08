@@ -21,7 +21,7 @@ sa:
 pi:
   function: Before
   role: Preposition
-  definition: "after"
+  definition: "before"
 nu: # to want
   role: Verb
   function: Desire

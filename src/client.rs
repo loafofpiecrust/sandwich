@@ -107,7 +107,6 @@ impl Client {
             if let Some(op) = op {
                 println!("op: {:?}", op);
                 let s = op.encode(&self.lang);
-                println!("message: {}", s);
                 self.say_phrase(&s, None).await?;
                 let message = Message::new(Some(s), None);
                 message.send(&mut stream).await?;
@@ -257,6 +256,7 @@ impl Client {
         // stream: &mut TcpStream,
     ) -> anyhow::Result<()> {
         println!("saying {}", phrase);
+        println!("{:?}", self.parse(phrase));
         println!("with sandwich {:?}", sandwich);
 
         // let mut buf = [0; 512];

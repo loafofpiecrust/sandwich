@@ -8,11 +8,11 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 const SANDWICH_PORT: u16 = 34222;
-const HOSTS: &[&str] = &["SANDWICH2", "loafofpiecrust"];
+const HOSTS: &[&str] = &["sandwich2", "loafofpiecrust"];
 lazy_static! {
     pub static ref BG_COLORS: HashMap<&'static str, &'static str> = hashmap! {
-        "SANDWICH2" => "#000000ff",
-        "loafofpiecrust" => "#ffffffff",
+        "sandwich2" => "ffbd33ff",
+        "loafofpiecrust" => "ffffffff",
     };
 }
 
@@ -44,8 +44,6 @@ pub async fn wait_for_peer() -> (std::io::Result<TcpStream>, &'static str) {
     let (stream, _addr) = conn.accept().await.expect("Failed to find peer");
     println!("Client connected!!");
     let ourselves = hostname::get().expect("We should have a hostname");
-    (
-        Ok(stream),
-        BG_COLORS[ourselves.as_os_str().to_str().unwrap()],
-    )
+    let hostname = ourselves.as_os_str().to_str().unwrap().to_lowercase();
+    (Ok(stream), BG_COLORS[&hostname as &str])
 }
