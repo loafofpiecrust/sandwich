@@ -32,7 +32,7 @@ pub fn setup_display<'a>() -> RenderSender {
                 encoder: window.factory.create_command_buffer().into(),
             };
             let scale = 2.0;
-            let offset = 10.0;
+            let offset = 5.0;
             let mut font = window.load_font("assets/OpenSans-Regular.ttf").unwrap();
             let mut texture_map = HashMap::new();
             let mut textures = Vec::new();
