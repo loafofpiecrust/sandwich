@@ -40,7 +40,7 @@ impl State for Idle {
                     return (
                         Some(
                             lang.dictionary
-                                .first_word_in_class(WordFunction::Greeting)
+                                .word_for_def(WordFunction::Greeting)
                                 .0
                                 .into(),
                         ),
@@ -64,7 +64,7 @@ impl State for Idle {
         (
             Some(
                 lang.dictionary
-                    .first_word_in_class(WordFunction::Negation)
+                    .word_for_def(WordFunction::Negation)
                     .0
                     .into(),
             ),
@@ -110,7 +110,7 @@ impl State for MakingSandwich {
             _ => (WordFunction::Negation, None),
         };
 
-        let (word, entry) = lang.dictionary.first_word_in_class(word);
+        let (word, entry) = lang.dictionary.word_for_def(word);
         lang.display
             .send(Render {
                 ingredients: Some(self.sandwich.ingredients.clone()),

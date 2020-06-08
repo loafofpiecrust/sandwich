@@ -102,7 +102,7 @@ impl Encoder for DesireEncoder {
             .to_word(&ingredient, String::new())
             .unwrap();
         // TODO Support for negative here.
-        let (verb, _) = context.dictionary.first_word_in_class(WordFunction::Desire);
+        let (verb, _) = context.dictionary.word_for_def(WordFunction::Desire);
         format!("{} {}", obj, verb)
     }
     fn noun_phrase<'a>(
@@ -206,7 +206,7 @@ impl Encoder for RelativeEncoder {
                     .ingredients
                     .to_word(&item.sandwich.ingredients[previous], String::new())
                     .unwrap();
-                let (prep, _) = context.dictionary.first_word_in_class(WordFunction::After);
+                let (prep, _) = context.dictionary.word_for_def(WordFunction::After);
                 // Syntax is: V'[PP[NP P] V'...]
                 match self.pick_side() {
                     // TODO Allow the head/inner to switch sides!
@@ -238,7 +238,7 @@ impl Encoder for RelativeEncoder {
                     .ingredients
                     .to_word(&item.sandwich.ingredients[next], String::new())
                     .unwrap();
-                let (prep, _) = context.dictionary.first_word_in_class(WordFunction::Before);
+                let (prep, _) = context.dictionary.word_for_def(WordFunction::Before);
                 // Syntax is: V'[PP[NP P] V'...]
                 match self.pick_side() {
                     // TODO Allow the head/inner to switch sides!

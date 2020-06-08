@@ -32,7 +32,7 @@ impl Dictionary {
 
         Self { words, ingredients }
     }
-    pub fn first_word_in_class(&self, category: WordFunction) -> (&str, &DictionaryEntry) {
+    pub fn word_for_def(&self, category: WordFunction) -> (&str, &DictionaryEntry) {
         for (word, entry) in &self.words {
             if entry.function == category {
                 return (word, entry);
@@ -74,6 +74,7 @@ pub enum WordFunction {
     Desire,
     After,
     Before,
+    And,
     /// Please and thank you.
     Polite,
     // Lexical Functions
@@ -369,6 +370,7 @@ pub fn word_with_role(
     }
 }
 
+/// Matches a negated phrase to reverse the inner meaning, either "not A" or just "A".
 // TODO Add probability to understand negation.
 fn neg_p<'a>(
     input: &'a [AnnotatedWord],
@@ -406,18 +408,20 @@ fn number(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], u32> {
     )(input)
 }
 
+/// Matches numbered phrases, either "do A, X times" or just "A".
 fn numbered_p<'a>(
     input: &'a [AnnotatedWord],
     lang: &Language,
 ) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
     alt((
         map(pair(number, |i| neg_p(i, lang)), |(n, vp)| {
-            Box::new(ops::Multiple(n, vp)) as Box<dyn Operation>
+            Box::new(ops::Repeat(n, vp)) as Box<dyn Operation>
         }),
         |i| neg_p(i, lang),
     ))(input)
 }
 
+/// Matches prepositional phrases, either "A prep B" or just "A".
 fn pos_p<'a>(
     input: &'a [AnnotatedWord],
     lang: &Language,
@@ -435,11 +439,13 @@ fn greeting<'a>(input: &'a [AnnotatedWord]) -> IResult<&'a [AnnotatedWord], Box<
     )(input)
 }
 
+/// Top level sentence parser, either some general phrase or a special one like
+/// a greeting.
 fn sentence<'a>(
     input: &'a [AnnotatedWord],
     lang: &Language,
 ) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
-    alt((|i| numbered_p(i, lang), greeting))(input)
+    alt((|i| conjuncted_phrase(i, lang), greeting))(input)
 }
 
 /// VP -> (NP) V
@@ -459,4 +465,23 @@ pub fn clause_new<'a>(
             _ => todo!("Verb other than 'Desire' used"),
         },
     )(input)
+}
+
+/// Matches "A and B" or just "A"
+/// TODO Move around the position of the conjunction.
+fn conjuncted_phrase<'a>(
+    input: &'a [AnnotatedWord],
+    lang: &Language,
+) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
+    alt((
+        map(
+            separated_pair(
+                |i| numbered_p(i, lang),
+                |i| word_with_def(i, WordFunction::And),
+                |i| numbered_p(i, lang),
+            ),
+            |(a, b)| Box::new(ops::Compound(a, b)) as Box<dyn Operation>,
+        ),
+        |i| numbered_p(i, lang),
+    ))(input)
 }

@@ -27,6 +27,7 @@ use crate::{
 };
 use async_std::net::TcpStream;
 use async_std::prelude::*;
+use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -66,12 +67,12 @@ impl Operation for Add {
         // TODO Use language weight for whether to actually use the adposition.
         let prep = match &self.1 {
             Relative::Before(other) => {
-                let p = lang.dictionary.first_word_in_class(WordFunction::Before);
+                let p = lang.dictionary.word_for_def(WordFunction::Before);
                 let n = lang.dictionary.ingredients.to_word(&other, String::new());
                 format!("{} {} ", n.unwrap(), p.0)
             }
             Relative::After(other) => {
-                let p = lang.dictionary.first_word_in_class(WordFunction::After);
+                let p = lang.dictionary.word_for_def(WordFunction::After);
                 let n = lang.dictionary.ingredients.to_word(&other, String::new());
                 format!("{} {} ", n.unwrap(), p.0)
             }
@@ -79,7 +80,7 @@ impl Operation for Add {
         };
 
         // Get the word for our verb and ingredient.
-        let verb = lang.dictionary.first_word_in_class(WordFunction::Desire);
+        let verb = lang.dictionary.word_for_def(WordFunction::Desire);
         let obj = lang.dictionary.ingredients.to_word(&self.0, String::new());
         // TODO Change by word order.
         format!("{}{} {}", prep, obj.unwrap(), verb.0)
@@ -120,7 +121,7 @@ impl Operation for Remove {
         Box::new(Add(self.0.clone(), Relative::Top))
     }
     fn encode(&self, lang: &Language) -> String {
-        let neg = lang.dictionary.first_word_in_class(WordFunction::Negation);
+        let neg = lang.dictionary.word_for_def(WordFunction::Negation);
         format!("{} {}", neg.0, self.reverse().encode(lang))
     }
 }
@@ -138,14 +139,15 @@ impl Operation for Finish {
         Box::new(self.clone())
     }
     fn encode(&self, lang: &Language) -> String {
-        let bye = lang.dictionary.first_word_in_class(WordFunction::Greeting);
+        let bye = lang.dictionary.word_for_def(WordFunction::Greeting);
         bye.0.into()
     }
 }
 
+/// Applies an operation on a sandwich multiple times.
 #[derive(Debug)]
-pub struct Multiple(pub u32, pub Box<dyn Operation>);
-impl Operation for Multiple {
+pub struct Repeat(pub u32, pub Box<dyn Operation>);
+impl Operation for Repeat {
     fn apply(&self, sandwich: Sandwich) -> Sandwich {
         let mut sandwich = sandwich;
         for _ in 0..self.0 {
@@ -162,6 +164,25 @@ impl Operation for Multiple {
     }
 }
 
+/// Applies two operations sequentially on a sandwich.
+#[derive(Debug)]
+pub struct Compound(pub Box<dyn Operation>, pub Box<dyn Operation>);
+impl Operation for Compound {
+    fn apply(&self, sandwich: Sandwich) -> Sandwich {
+        // Apply the inner operations sequentially.
+        self.1.apply(self.0.apply(sandwich))
+    }
+    // TODO This could also just reverse the order of it?
+    fn reverse(&self) -> Box<dyn Operation> {
+        Box::new(Compound(self.0.reverse(), self.1.reverse()))
+    }
+    fn encode(&self, lang: &Language) -> String {
+        let conj = lang.dictionary.word_for_def(WordFunction::And);
+        // Conjunction goes between two sub-phrases.
+        format!("{} {} {}", self.0.encode(lang), conj.0, self.1.encode(lang))
+    }
+}
+
 // pub struct Negate(Box<dyn Operation>);
 // impl Operation for Negate {
 //     fn apply(self, sandwich: Sandwich) -> Sandwich {
@@ -172,15 +193,9 @@ impl Operation for Multiple {
 //     }
 // }
 
-struct Allergy {
-    ingredient: Ingredient,
-    severity: f64,
-}
-
 pub struct Order {
     forgotten: Vec<Box<dyn Operation>>,
     history: Vec<Box<dyn Operation>>,
-    allergies: Vec<Allergy>,
     personality: Personality,
     desired: Sandwich,
 }
@@ -189,16 +204,17 @@ impl Order {
         Self {
             forgotten: Vec::new(),
             history: Vec::new(),
-            personality: Personality::new(),
+            personality: Personality::new(lang),
             // TODO Pick a sandwich based on our personality.
             desired: Sandwich::random(&lang.dictionary.ingredients, 5),
-            allergies: vec![Allergy {
-                severity: 0.5,
-                ingredient: lang.dictionary.ingredients.random().clone(),
-            }],
         }
     }
+
+    /// Based on the current conversation state and resulting sandwich, choose
+    /// an operation to ask our conversation partner to apply to said sandwich.
     pub fn pick_op(&mut self, result: &Sandwich) -> Option<Box<dyn Operation>> {
+        let mut rng = thread_rng();
+
         // If the result has all the ingredients we want, then we're finished.
         let has_all = self
             .desired
@@ -209,7 +225,6 @@ impl Order {
             return None;
         }
 
-        let mut rng = thread_rng();
         // The basic behavior: pick the next ingredient on the sandwich.
         // Find the top-most shared ingredient between desired and result.
         let last_shared = self
@@ -225,6 +240,8 @@ impl Order {
         if rng.gen_bool(self.personality.forgetfulness) {
             next_idx += 1;
         }
+
+        // TODO When considering a removal, maybe try to do a swap instead.
 
         // There's a mistake if any preceding ingredients aren't in the result sandwich.
         // NOTE disregarding order for the moment.
@@ -267,11 +284,12 @@ impl Order {
 
         // Check for allergens in the result sandwich.
         let allergen = self
+            .personality
             .allergies
             .iter()
             // TODO Use contains logic here instead of exact match, allowing
             // allergies to whole categories.
-            .filter(|a| result.ingredients.iter().any(|x| &a.ingredient == x))
+            .filter(|a| result.ingredients.iter().any(|x| a.ingredient.includes(x)))
             .next();
 
         if let Some(allergen) = allergen {
@@ -279,6 +297,30 @@ impl Order {
             // ingredient to be removed.
             if rng.gen_bool(allergen.severity) && !rng.gen_bool(self.personality.shyness) {
                 return Some(Box::new(Remove(allergen.ingredient.clone())));
+            }
+        }
+
+        // TODO Change my mind about what I want based on my favorites.
+        if rng.gen_bool(self.personality.spontaneity) {
+            // If our previous desires contain too few of our favorites, then
+            // add one in.
+            let any_favs = self.desired.ingredients.iter().any(|x| {
+                // Check if one of our favorites includes this ingredient.
+                self.personality
+                    .favorites
+                    .iter()
+                    .any(|fav| fav.ingredient.includes(x) && rng.gen_bool(fav.severity))
+            });
+            if !any_favs {
+                // Pick a random favorite based on their severity.
+                // NOTE Assumes every machine has at least one favorite.
+                let weights = self.personality.favorites.iter().map(|x| x.severity);
+                let dist = WeightedIndex::new(weights).unwrap();
+                let pick = dist.sample(&mut rng);
+                return Some(Box::new(Add(
+                    self.personality.favorites[pick].ingredient.clone(),
+                    Relative::Top,
+                )));
             }
         }
 
@@ -293,12 +335,11 @@ impl Order {
                 .desired
                 .ingredients
                 .iter()
-                .skip(next_idx) // If we want index 1, skip just the zero-th.
+                .skip(next_idx) // If we want index 1, skip just the zeroth.
                 .take_while(|x| x == &next_ingr)
                 .count();
             if same_count > 1 {
-                // TODO Wrap an existing Add op.
-                Box::new(Multiple(same_count as u32, adder)) as Box<dyn Operation>
+                Box::new(Repeat(same_count as u32, adder)) as Box<dyn Operation>
             } else {
                 // Default behavior, just add the next ingredient to the top of the sandwich.
                 adder as Box<dyn Operation>
@@ -307,6 +348,7 @@ impl Order {
     }
 }
 
+/// A single message of text and/or a sandwich.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
     pub text: Option<String>,

@@ -55,8 +55,8 @@ impl Allergy {
             .next();
         allergic.map(|bad_item| {
             // Say "remove this ingredient"
-            let verb = lang.dictionary.first_word_in_class(WordFunction::Desire);
-            let neg = lang.dictionary.first_word_in_class(WordFunction::Negation);
+            let verb = lang.dictionary.word_for_def(WordFunction::Desire);
+            let neg = lang.dictionary.word_for_def(WordFunction::Negation);
             let ingr = lang.dictionary.ingredients.to_word(bad_item, String::new());
             format!("{} {} {}", ingr.unwrap(), verb.0, neg.0)
         })

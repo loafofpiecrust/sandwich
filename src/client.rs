@@ -319,7 +319,7 @@ impl Client {
         let (hello, _) = self
             .lang
             .dictionary
-            .first_word_in_class(WordFunction::Greeting);
+            .word_for_def(WordFunction::Greeting);
 
         // self.say_phrase(hello, None, other).await?;
 
