@@ -184,6 +184,22 @@ impl Operation for Compound {
     }
 }
 
+/// Applies to (roughly) the duration of an order, and means this ingredient
+/// should never be added to the sandwich. Expressed with allergen terminology.
+#[derive(Debug)]
+pub struct NeverAdd(pub Ingredient);
+impl Operation for NeverAdd {
+    fn apply(&self, sandwich: Sandwich) -> Sandwich {
+        todo!()
+    }
+    fn reverse(&self) -> Box<dyn Operation> {
+        todo!()
+    }
+    fn encode(&self, lang: &Language) -> String {
+        todo!()
+    }
+}
+
 // #[derive(Debug)]
 // pub struct ChangeBackground(pub String);
 // impl Operation for ChangeBackground {
@@ -330,7 +346,7 @@ impl Order {
                     .iter()
                     .any(|fav| fav.ingredient.includes(x) && rng.gen_bool(fav.severity))
             });
-            if !any_favs {
+            if !any_favs && !self.personality.favorites.is_empty() {
                 // Pick a random favorite based on their severity.
                 // NOTE Assumes every machine has at least one favorite.
                 let weights = self.personality.favorites.iter().map(|x| x.severity);

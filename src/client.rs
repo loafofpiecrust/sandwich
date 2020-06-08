@@ -162,6 +162,13 @@ impl Client {
                 .expect("Failed to parse phrase");
             take(&mut self.last_result, |s| op.apply(s));
 
+            // TODO Render upon saying a response?
+            self.lang.render(Render {
+                subtitles: None,
+                ingredients: self.last_result.ingredients.clone(),
+                background: None,
+            })?;
+
             // Only break the loop when the order is complete.
             if self.last_result.complete {
                 break;
