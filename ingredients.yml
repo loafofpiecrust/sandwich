@@ -4,13 +4,13 @@ children:
 - name: base
   morpheme: po
   children:
-  - name: bagel
-    morpheme: lo
-    children:
-    - name: bagel-bottom
-      morpheme: lo
-    - name: bagel-top
-      morpheme: lu
+  # - name: bagel
+  #   morpheme: lo
+  #   children:
+  #   - name: bagel-bottom
+  #     morpheme: lo
+  #   - name: bagel-top
+  #     morpheme: lu
   - name: white bread
     morpheme: ni
     children:
@@ -27,13 +27,13 @@ children:
     morpheme: na
   - name: a/colby-jack
     morpheme: ke
-  - name: fresh-mozzerella
-    morpheme: me
+  # - name: fresh-mozzerella
+  #   morpheme: me
 - name: greens
   morpheme: we
   children:
-  - name: green-pepper
-    morpheme: ki
+  # - name: green-pepper
+  #   morpheme: ki
   - name: a/lettuce
     morpheme: nu
   - name: a/onions
@@ -65,13 +65,13 @@ children:
       morpheme: mo
     - name: a/anchovies
       morpheme: si
-  - name: fried-egg
-    morpheme: lo
+  # - name: fried-egg
+  #   morpheme: lo
 - name: fruit
   morpheme: na
   children:
-  - name: avocado
-    morpheme: so
+  # - name: avocado
+  #   morpheme: so
   - name: a/tomato
     morpheme: pe
   - name: a/olives
