@@ -18,6 +18,7 @@ use bincode;
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::sink::SinkExt;
 use itertools::Itertools;
+use rand::prelude::*;
 use take_mut::take;
 // use futures::prelude::*;
 use futures::{pin_mut, select, FutureExt};
@@ -83,6 +84,8 @@ impl Client {
         mut stream: TcpStream,
         color: &'static str,
     ) -> anyhow::Result<()> {
+        let mut rng = thread_rng();
+
         // Set the shared background color.
         self.lang.render(Render {
             ingredients: None,
@@ -114,7 +117,7 @@ impl Client {
                 // TODO Some machines may wait for responses before sending the
                 // next operation. Or start waiting if there's a buffer of
                 // messages that haven't been acknowledged.
-                task::sleep(Duration::from_millis(1000)).await;
+                task::sleep(Duration::from_millis(rng.gen_range(700, 1500))).await;
             } else {
                 // Break the loop if there's no more operations to make!
                 println!("the sandwich is finished!");
