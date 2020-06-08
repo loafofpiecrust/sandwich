@@ -17,6 +17,7 @@ use async_std::task;
 use bincode;
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::sink::SinkExt;
+use itertools::Itertools;
 use take_mut::take;
 // use futures::prelude::*;
 use futures::{pin_mut, select, FutureExt};
@@ -65,8 +66,8 @@ impl Client {
         let server = comm::wait_for_peer().fuse();
         pin_mut!(client, server);
         select! {
-            s = client => self.new_customer(s?).await,
-            s = server => self.new_server(s?).await,
+            s = client => self.new_customer(s.0?, s.1).await,
+            s = server => self.new_server(s.0?, s.1).await,
         }
     }
 
@@ -77,7 +78,18 @@ impl Client {
         }
     }
 
-    async fn new_customer(&mut self, mut stream: TcpStream) -> anyhow::Result<()> {
+    async fn new_customer(
+        &mut self,
+        mut stream: TcpStream,
+        color: &'static str,
+    ) -> anyhow::Result<()> {
+        // Set the shared background color.
+        self.lang.render(Render {
+            ingredients: None,
+            subtitles: None,
+            background: Some(color),
+        })?;
+
         // No greeting for now, treating the TCP connection itself as the greeting.
         let mut order = Order::new(&self.lang);
         let (msg_sx, mut msg_rx) = channel(1);
@@ -129,7 +141,18 @@ impl Client {
     //     Ok(())
     // }
 
-    async fn new_server(&mut self, mut stream: TcpStream) -> anyhow::Result<()> {
+    async fn new_server(
+        &mut self,
+        mut stream: TcpStream,
+        color: &'static str,
+    ) -> anyhow::Result<()> {
+        // Set the shared background color.
+        self.lang.render(Render {
+            ingredients: None,
+            subtitles: None,
+            background: Some(color),
+        })?;
+
         self.last_result = Sandwich::default();
         loop {
             // TODO This machine might wait to receive multiple operations before applying them all at once.
@@ -243,7 +266,10 @@ impl Client {
         self.lang.render(Render {
             ingredients: sandwich.map(|x| x.ingredients),
             // subtitles: self.parse(phrase).map(|x| x.subtitles()),
-            subtitles: None,
+            subtitles: self
+                .lex(phrase)
+                .map(|w| w.into_iter().map(|w| w.entry.unwrap().definition).join(" ")),
+            background: None,
         })?;
 
         // Play the phrase out loud.
@@ -285,6 +311,11 @@ impl Client {
     pub fn parse(&self, input: &str) -> Option<Box<dyn Operation>> {
         sentence_new(input.as_bytes(), &self.lang)
     }
+    pub fn lex(&self, input: &str) -> Option<Vec<grammar::AnnotatedWord>> {
+        grammar::phrase(input.as_bytes())
+            .ok()
+            .map(|p| grammar::annotate(p.1, &self.lang))
+    }
     pub fn invent_sandwich(&self) -> Sandwich {
         Sandwich::random(&self.lang.dictionary.ingredients, 6)
     }
@@ -316,10 +347,7 @@ impl Client {
         Ok(())
     }
     async fn greet(&self, other: &mut TcpStream) -> anyhow::Result<Option<Sandwich>> {
-        let (hello, _) = self
-            .lang
-            .dictionary
-            .word_for_def(WordFunction::Greeting);
+        let (hello, _) = self.lang.dictionary.word_for_def(WordFunction::Greeting);
 
         // self.say_phrase(hello, None, other).await?;
 

@@ -109,19 +109,24 @@ impl Ingredient {
     }
 }
 
+pub const BG_COLORS: &[&str] = &["#00000000"];
+
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Sandwich {
     pub ingredients: Vec<Ingredient>,
     pub complete: bool,
+    pub background_color: String,
 }
 impl Sandwich {
     pub fn new(ingredients: Vec<Ingredient>) -> Self {
         Self {
             ingredients,
             complete: false,
+            background_color: BG_COLORS[0].into(),
         }
     }
     pub fn random(all_ingredients: &Ingredient, len: usize) -> Self {
+        let mut rng = thread_rng();
         // Pick a base first, then the inside ingredients.
         let mut ingredients = Vec::new();
         let (bottom, top) = all_ingredients.random_base();
@@ -130,13 +135,14 @@ impl Sandwich {
             (0..)
                 .map(|_| all_ingredients.random().clone())
                 // 20% chance for an ingredient to duplicate.
-                .unique_by(|x| format!("{}{}", x.name, thread_rng().gen_bool(0.8)))
+                .unique_by(|x| format!("{}{}", x.name, rng.gen_bool(0.8)))
                 .take(len),
         );
         ingredients.push(top.clone());
         Self {
             ingredients,
             complete: true,
+            background_color: BG_COLORS.choose(&mut rng).unwrap().to_string(),
         }
     }
     pub fn to_words(&self, dictionary: &Dictionary) -> Vec<String> {

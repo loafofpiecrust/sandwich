@@ -23,3 +23,6 @@ async-std = {version = "1.5", features = ["attributes"]}
 hostname = "0.3"
 piston2d-graphics = "0.36"
 piston_window = "*"
+palette = "*"
+maplit = "*"
+lazy_static = "*"

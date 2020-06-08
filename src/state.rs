@@ -115,6 +115,7 @@ impl State for MakingSandwich {
             .send(Render {
                 ingredients: Some(self.sandwich.ingredients.clone()),
                 subtitles: Some(entry.definition.clone()),
+                background: None,
             })
             .unwrap();
 

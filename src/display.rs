@@ -8,6 +8,7 @@ use std::thread;
 pub struct Render {
     pub ingredients: Option<Vec<Ingredient>>,
     pub subtitles: Option<String>,
+    pub background: Option<&'static str>,
 }
 
 pub type RenderSender = SyncSender<Render>;
@@ -36,6 +37,7 @@ pub fn setup_display<'a>() -> RenderSender {
             let mut texture_map = HashMap::new();
             let mut textures = Vec::new();
             let mut subtitles = String::new();
+            let mut background = [0.0, 0.0, 0.0, 1.0];
             while let Some(e) = window.next() {
                 // Try to receive render updates if there are any.
                 if let Ok(render) = receiver.try_recv() {
@@ -64,9 +66,12 @@ pub fn setup_display<'a>() -> RenderSender {
                     if let Some(subs) = render.subtitles {
                         subtitles = subs;
                     }
+                    if let Some(bg) = render.background {
+                        background = piston_window::color::hex(bg);
+                    }
                 }
                 window.draw_2d(&e, |c, g, d| {
-                    clear([0.0, 0.0, 0.0, 1.0], g);
+                    clear(background, g);
 
                     // Render the subtitles.
                     let sub_t = c.transform.trans(200.0, 800.0);

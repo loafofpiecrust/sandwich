@@ -1,15 +1,24 @@
 use async_std::io;
 use async_std::net::{TcpListener, TcpStream};
 use hostname;
+use lazy_static::*;
+use maplit::*;
 use rand::prelude::*;
+use std::collections::HashMap;
 use std::time::Duration;
 
 const SANDWICH_PORT: u16 = 34222;
 const HOSTS: &[&str] = &["SANDWICH2", "loafofpiecrust"];
+lazy_static! {
+    pub static ref BG_COLORS: HashMap<&'static str, &'static str> = hashmap! {
+        "SANDWICH2" => "#000000ff",
+        "loafofpiecrust" => "#ffffffff",
+    };
+}
 
-pub async fn find_peer() -> std::io::Result<TcpStream> {
+pub async fn find_peer() -> (std::io::Result<TcpStream>, &'static str) {
     // Try connecting to a random peer until it succeeds.
-    let ourselves = hostname::get()?;
+    let ourselves = hostname::get().expect("We should have a hostname");
     let our_name = ourselves.as_os_str().to_str().unwrap();
     println!("our hostname = {}", our_name);
     loop {
@@ -23,14 +32,20 @@ pub async fn find_peer() -> std::io::Result<TcpStream> {
         let stream = io::timeout(Duration::from_secs(1), TcpStream::connect(url)).await;
         if stream.is_ok() {
             println!("Connected to {}", host);
-            return stream;
+            return (stream, BG_COLORS[host]);
         }
     }
 }
 
-pub async fn wait_for_peer() -> std::io::Result<TcpStream> {
-    let conn = TcpListener::bind(format!("0.0.0.0:{}", SANDWICH_PORT)).await?;
-    let (stream, _addr) = conn.accept().await?;
+pub async fn wait_for_peer() -> (std::io::Result<TcpStream>, &'static str) {
+    let conn = TcpListener::bind(format!("0.0.0.0:{}", SANDWICH_PORT))
+        .await
+        .expect("Failed to start TCP server");
+    let (stream, _addr) = conn.accept().await.expect("Failed to find peer");
     println!("Client connected!!");
-    Ok(stream)
+    let ourselves = hostname::get().expect("We should have a hostname");
+    (
+        Ok(stream),
+        BG_COLORS[ourselves.as_os_str().to_str().unwrap()],
+    )
 }

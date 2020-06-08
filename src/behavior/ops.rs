@@ -27,6 +27,7 @@ use crate::{
 };
 use async_std::net::TcpStream;
 use async_std::prelude::*;
+use palette::{named, Srgb};
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -182,6 +183,24 @@ impl Operation for Compound {
         format!("{} {} {}", self.0.encode(lang), conj.0, self.1.encode(lang))
     }
 }
+
+// #[derive(Debug)]
+// pub struct ChangeBackground(pub String);
+// impl Operation for ChangeBackground {
+//     fn apply(&self, sandwich: Sandwich) -> Sandwich {
+//         Sandwich {
+//             background_color: self.0.clone(),
+//             ..sandwich
+//         }
+//     }
+//     fn reverse(&self) -> Box<dyn Operation> {
+//         todo!()
+//     }
+//     fn encode(&self, lang: &Language) -> String {
+
+//         todo!()
+//     }
+// }
 
 // pub struct Negate(Box<dyn Operation>);
 // impl Operation for Negate {
