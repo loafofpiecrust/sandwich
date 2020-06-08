@@ -239,7 +239,7 @@ impl Operation for NeverAdd {
 pub struct Order {
     forgotten: Vec<Box<dyn Operation>>,
     history: Vec<Box<dyn Operation>>,
-    personality: Personality,
+    pub personality: Personality,
     desired: Sandwich,
 }
 impl Order {
@@ -395,17 +395,17 @@ impl Order {
                 Box::new(Repeat(same_count as u32, adder)) as Box<dyn Operation>
             } else {
                 // If your memory is good and you aren't shy, ask for two ingredients at once.
-                let another_one = self.desired.ingredients.get(next_idx + 1);
-                if let Some(another_one) = another_one {
-                    if !rng.gen_bool(self.personality.forgetfulness)
-                        && !rng.gen_bool(self.personality.shyness)
-                    {
-                        return Box::new(Compound(
-                            adder,
-                            Box::new(Add(another_one.clone(), Relative::Top)),
-                        )) as Box<dyn Operation>;
-                    }
-                }
+                // let another_one = self.desired.ingredients.get(next_idx + 1);
+                // if let Some(another_one) = another_one {
+                //     if !rng.gen_bool(self.personality.forgetfulness)
+                //         && !rng.gen_bool(self.personality.shyness)
+                //     {
+                //         return Box::new(Compound(
+                //             adder,
+                //             Box::new(Add(another_one.clone(), Relative::Top)),
+                //         )) as Box<dyn Operation>;
+                //     }
+                // }
 
                 // Default behavior, just add the next ingredient to the top of the sandwich.
                 adder as Box<dyn Operation>

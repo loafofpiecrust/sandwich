@@ -36,7 +36,7 @@ loti:
   definition: "please/thank you"
 suho:
   function: And
-  role: Conjunction
+  role: NounConjunction
   definition: "and"
 po:
   role: Adjective

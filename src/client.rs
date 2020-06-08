@@ -109,8 +109,18 @@ impl Client {
                 }
             }
             // Send over the next operation!
-            let op = order.pick_op(&self.last_result);
-            if let Some(op) = op {
+            let mut op = order.pick_op(&self.last_result);
+
+            if let Some(mut op) = op {
+                if !rng.gen_bool(order.personality.forgetfulness)
+                    && !rng.gen_bool(order.personality.shyness)
+                {
+                    let assumed_sandwich =
+                        op.apply(self.last_result.clone(), &mut order.personality);
+                    if let Some(next_op) = order.pick_op(&assumed_sandwich) {
+                        op = Box::new(ops::Compound(op, next_op));
+                    }
+                }
                 println!("op: {:?}", op);
                 let s = op.encode(&self.lang);
                 self.say_phrase(&s, None).await?;
