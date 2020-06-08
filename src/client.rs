@@ -165,7 +165,7 @@ impl Client {
             // TODO Render upon saying a response?
             self.lang.render(Render {
                 subtitles: None,
-                ingredients: self.last_result.ingredients.clone(),
+                ingredients: Some(self.last_result.ingredients.clone()),
                 background: None,
             })?;
 
