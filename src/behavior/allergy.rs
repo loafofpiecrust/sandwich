@@ -1,6 +1,6 @@
 use super::Behavior;
 use crate::{
-    client::Language,
+    behavior::Personality,
     grammar::WordFunction,
     sandwich::{Ingredient, Sandwich},
 };
@@ -46,7 +46,7 @@ impl Allergy {
     fn is_allergic(&self, ingredient: &Ingredient) -> bool {
         self.ingredient.includes(ingredient)
     }
-    fn react(&self, sandwich: &Sandwich, lang: &Language) -> Option<String> {
+    fn react(&self, sandwich: &Sandwich, lang: &Personality) -> Option<String> {
         // Need access to the dictionary.
         let allergic = sandwich
             .ingredients

@@ -21,7 +21,6 @@
 
 use crate::{
     behavior::Personality,
-    client::Language,
     grammar::WordFunction,
     sandwich::{Ingredient, Sandwich},
 };
@@ -35,7 +34,7 @@ use serde::{Deserialize, Serialize};
 pub trait Operation: std::fmt::Debug {
     fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich;
     fn reverse(&self) -> Box<dyn Operation>;
-    fn encode(&self, lang: &Language) -> String;
+    fn encode(&self, lang: &Personality) -> String;
 }
 
 /// Add an ingredient to a sandwich, at the very end or relative to another ingredient.
@@ -45,11 +44,16 @@ impl Operation for Add {
     fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
         let mut ingr = sandwich.ingredients;
         let idx = match &self.1 {
-            Relative::Before(other) => ingr.iter().position(|x| x.name == other.name),
-            Relative::After(other) => ingr
-                .iter()
-                .position(|x| x.name == other.name)
-                .map(|x| x + 1),
+            Relative::Before(other) => {
+                Personality::upgrade_skill(&mut personality.adposition);
+                ingr.iter().position(|x| x.name == other.name)
+            }
+            Relative::After(other) => {
+                Personality::upgrade_skill(&mut personality.adposition);
+                ingr.iter()
+                    .position(|x| x.name == other.name)
+                    .map(|x| x + 1)
+            }
             Relative::Top => Some(ingr.len()),
         };
         if let Some(idx) = idx {
@@ -64,7 +68,7 @@ impl Operation for Add {
     fn reverse(&self) -> Box<dyn Operation> {
         Box::new(Remove(self.0.clone()))
     }
-    fn encode(&self, lang: &Language) -> String {
+    fn encode(&self, lang: &Personality) -> String {
         // Encode prepositional phrase.
         // TODO Use language weight for whether to actually use the adposition.
         let prep = match &self.1 {
@@ -116,6 +120,7 @@ impl Operation for Remove {
         }
         // Ingredient removal raises spite!
         personality.spite += 0.1;
+        Personality::upgrade_skill(&mut personality.negation);
         Sandwich {
             ingredients,
             ..sandwich
@@ -124,7 +129,7 @@ impl Operation for Remove {
     fn reverse(&self) -> Box<dyn Operation> {
         Box::new(Add(self.0.clone(), Relative::Top))
     }
-    fn encode(&self, lang: &Language) -> String {
+    fn encode(&self, lang: &Personality) -> String {
         let neg = lang.dictionary.word_for_def(WordFunction::Negation);
         format!("{} {}", neg.0, self.reverse().encode(lang))
     }
@@ -142,7 +147,7 @@ impl Operation for Finish {
     fn reverse(&self) -> Box<dyn Operation> {
         Box::new(self.clone())
     }
-    fn encode(&self, lang: &Language) -> String {
+    fn encode(&self, lang: &Personality) -> String {
         let bye = lang.dictionary.word_for_def(WordFunction::Greeting);
         bye.0.into()
     }
@@ -153,6 +158,7 @@ impl Operation for Finish {
 pub struct Repeat(pub u32, pub Box<dyn Operation>);
 impl Operation for Repeat {
     fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
+        Personality::upgrade_skill(&mut personality.numbers);
         let mut sandwich = sandwich;
         for _ in 0..self.0 {
             sandwich = self.1.apply(sandwich, personality);
@@ -162,7 +168,7 @@ impl Operation for Repeat {
     fn reverse(&self) -> Box<dyn Operation> {
         Box::new(Self(self.0, self.1.reverse()))
     }
-    fn encode(&self, lang: &Language) -> String {
+    fn encode(&self, lang: &Personality) -> String {
         let num = lang.dictionary.word_for_num(self.0);
         format!("{} {}", num.0, self.1.encode(lang))
     }
@@ -173,6 +179,7 @@ impl Operation for Repeat {
 pub struct Compound(pub Box<dyn Operation>, pub Box<dyn Operation>);
 impl Operation for Compound {
     fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
+        Personality::upgrade_skill(&mut personality.conjunction);
         // Apply the inner operations sequentially.
         self.1
             .apply(self.0.apply(sandwich, personality), personality)
@@ -181,7 +188,7 @@ impl Operation for Compound {
     fn reverse(&self) -> Box<dyn Operation> {
         Box::new(Compound(self.0.reverse(), self.1.reverse()))
     }
-    fn encode(&self, lang: &Language) -> String {
+    fn encode(&self, lang: &Personality) -> String {
         let conj = lang.dictionary.word_for_def(WordFunction::And);
         // Conjunction goes between two sub-phrases.
         format!("{} {} {}", self.0.encode(lang), conj.0, self.1.encode(lang))
@@ -199,7 +206,7 @@ impl Operation for NeverAdd {
     fn reverse(&self) -> Box<dyn Operation> {
         todo!()
     }
-    fn encode(&self, lang: &Language) -> String {
+    fn encode(&self, lang: &Personality) -> String {
         // adjective: "I am allgergic to X"
         // or noun: "X is an allergy"
         // or verb: "I react to X"
@@ -220,7 +227,7 @@ impl Operation for NeverAdd {
 //     fn reverse(&self) -> Box<dyn Operation> {
 //         todo!()
 //     }
-//     fn encode(&self, lang: &Language) -> String {
+//     fn encode(&self, lang: &Personality) -> String {
 
 //         todo!()
 //     }
@@ -239,15 +246,13 @@ impl Operation for NeverAdd {
 pub struct Order {
     forgotten: Vec<Box<dyn Operation>>,
     history: Vec<Box<dyn Operation>>,
-    pub personality: Personality,
     desired: Sandwich,
 }
 impl Order {
-    pub fn new(lang: &Language) -> Self {
+    pub fn new(lang: &Personality) -> Self {
         Self {
             forgotten: Vec::new(),
             history: Vec::new(),
-            personality: Personality::new(lang),
             // TODO Pick a sandwich based on our personality.
             desired: Sandwich::random(&lang.dictionary.ingredients, 7),
         }
@@ -255,7 +260,11 @@ impl Order {
 
     /// Based on the current conversation state and resulting sandwich, choose
     /// an operation to ask our conversation partner to apply to said sandwich.
-    pub fn pick_op(&mut self, result: &Sandwich) -> Option<Box<dyn Operation>> {
+    pub fn pick_op(
+        &mut self,
+        personality: &Personality,
+        result: &Sandwich,
+    ) -> Option<Box<dyn Operation>> {
         let mut rng = thread_rng();
 
         // If the result has all the ingredients we want, then we're finished.
@@ -277,8 +286,7 @@ impl Order {
             .enumerate()
             // Mostly filter out allergens.
             .filter(|(idx, x)| {
-                !self
-                    .personality
+                !personality
                     .allergies
                     .iter()
                     .any(|a| &a.ingredient == *x && rng.gen_bool(a.severity))
@@ -289,7 +297,7 @@ impl Order {
         println!("next index we want: {}", next_idx);
 
         // Maybe forget this ingredient and move on to the next one.
-        if rng.gen_bool(self.personality.forgetfulness) {
+        if rng.gen_bool(personality.forgetfulness) {
             next_idx += 1;
         }
 
@@ -304,7 +312,7 @@ impl Order {
             .take(next_idx)
             .position(|x| !result.ingredients.contains(x));
         // If we aren't shy, try to correct a mistake!
-        if mistake.is_some() && !rng.gen_bool(self.personality.shyness) {
+        if mistake.is_some() && !rng.gen_bool(personality.shyness) {
             let idx = mistake.unwrap();
             // Pick a preposition to position the missing ingredient where we'd like it.
             // TODO If this machine doesn't care about ordering, then just ask to add it to the end.
@@ -335,8 +343,7 @@ impl Order {
         }
 
         // Check for allergens in the result sandwich.
-        let allergen = self
-            .personality
+        let allergen = personality
             .allergies
             .iter()
             // TODO Use contains logic here instead of exact match, allowing
@@ -347,30 +354,30 @@ impl Order {
         if let Some(allergen) = allergen {
             // If the allergy is severe and we aren't shy about it, ask for that
             // ingredient to be removed.
-            if rng.gen_bool(allergen.severity) && !rng.gen_bool(self.personality.shyness) {
+            if rng.gen_bool(allergen.severity) && !rng.gen_bool(personality.shyness) {
                 return Some(Box::new(Remove(allergen.ingredient.clone())));
             }
         }
 
         // TODO Change my mind about what I want based on my favorites.
-        if rng.gen_bool(self.personality.spontaneity) {
+        if rng.gen_bool(personality.spontaneity) {
             // If our previous desires contain too few of our favorites, then
             // add one in.
             let any_favs = self.desired.ingredients.iter().any(|x| {
                 // Check if one of our favorites includes this ingredient.
-                self.personality
+                personality
                     .favorites
                     .iter()
                     .any(|fav| fav.ingredient.includes(x) && rng.gen_bool(fav.severity))
             });
-            if !any_favs && !self.personality.favorites.is_empty() {
+            if !any_favs && !personality.favorites.is_empty() {
                 // Pick a random favorite based on their severity.
                 // NOTE Assumes every machine has at least one favorite.
-                let weights = self.personality.favorites.iter().map(|x| x.severity);
+                let weights = personality.favorites.iter().map(|x| x.severity);
                 let dist = WeightedIndex::new(weights).unwrap();
                 let pick = dist.sample(&mut rng);
                 return Some(Box::new(Add(
-                    self.personality.favorites[pick].ingredient.clone(),
+                    personality.favorites[pick].ingredient.clone(),
                     Relative::Top,
                 )));
             }

@@ -1,8 +1,7 @@
 use crate::display::Render;
 use crate::grammar::*;
 use crate::{
-    behavior::{Behavior, Behaviors, Encoder, PositionedIngredient},
-    client::Language,
+    behavior::{Behavior, Behaviors, Encoder, Personality, PositionedIngredient},
     sandwich::{Ingredient, Sandwich},
 };
 use seqalign::{measures::LevenshteinDamerau, Align};
@@ -14,7 +13,7 @@ pub trait State: std::fmt::Debug {
         &mut self,
         input: &PhraseNode,
         sandwich: Option<&Sandwich>,
-        lang: &Language,
+        lang: &Personality,
         encoder: &mut dyn Encoder,
         behavior: &mut Behaviors,
     ) -> (Option<String>, Option<Sandwich>, Option<Box<dyn State>>);
@@ -28,7 +27,7 @@ impl State for Idle {
         &mut self,
         input: &PhraseNode,
         sandwich: Option<&Sandwich>,
-        lang: &Language,
+        lang: &Personality,
         _encoder: &mut dyn Encoder,
         behavior: &mut Behaviors,
     ) -> (Option<String>, Option<Sandwich>, Option<Box<dyn State>>) {
@@ -91,7 +90,7 @@ impl State for MakingSandwich {
         &mut self,
         input: &PhraseNode,
         sandwich: Option<&Sandwich>,
-        lang: &Language,
+        lang: &Personality,
         encoder: &mut dyn Encoder,
         behavior: &mut Behaviors,
     ) -> (Option<String>, Option<Sandwich>, Option<Box<dyn State>>) {
@@ -153,7 +152,7 @@ impl State for OrderingSandwich {
         &mut self,
         input: &PhraseNode,
         sandwich: Option<&Sandwich>,
-        lang: &Language,
+        lang: &Personality,
         encoder: &mut dyn Encoder,
         behavior: &mut Behaviors,
     ) -> (Option<String>, Option<Sandwich>, Option<Box<dyn State>>) {

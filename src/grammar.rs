@@ -1,7 +1,8 @@
 use crate::behavior::{ops, Operation};
-use crate::{behavior::Encoder, client::Language, sandwich::Ingredient};
+use crate::{behavior::personality::Personality, sandwich::Ingredient};
 use itertools::Itertools;
 use nom::{branch::*, bytes::complete::*, combinator::*, multi::*, sequence::*, IResult, *};
+use rand::prelude::*;
 use serde::Deserialize;
 use serde_yaml;
 use std::{
@@ -180,7 +181,7 @@ pub fn phrase(input: &[u8]) -> IResult<&[u8], Phrase> {
     terminated(separated_list(tag(" "), word), opt(tag("\n")))(input)
 }
 
-pub fn annotate(phrase: Phrase, context: &Language) -> AnnotatedPhrase {
+pub fn annotate(phrase: Phrase, context: &Personality) -> AnnotatedPhrase {
     let mut result = AnnotatedPhrase::new();
     for word in phrase {
         let word_str = word.to_string();
@@ -195,7 +196,7 @@ pub fn annotate(phrase: Phrase, context: &Language) -> AnnotatedPhrase {
     result
 }
 
-pub fn sentence_new(input: &[u8], lang: &Language) -> Option<Box<dyn Operation>> {
+pub fn sentence_new(input: &[u8], lang: &Personality) -> Option<Box<dyn Operation>> {
     phrase(input).ok().and_then(|(_, parsed)| {
         let tagged = std::dbg!(annotate(std::dbg!(parsed), lang));
         if let Ok((_, op)) = sentence(&tagged, lang) {
@@ -336,7 +337,7 @@ pub fn noun(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], PhraseNode> {
 
 fn ingredient<'a>(
     input: &'a [AnnotatedWord],
-    lang: &Language,
+    lang: &Personality,
 ) -> IResult<&'a [AnnotatedWord], Ingredient> {
     map(
         |i| word_with_def(i, WordFunction::Ingredient),
@@ -374,23 +375,27 @@ pub fn word_with_role(
 // TODO Add probability to understand negation.
 fn neg_p<'a>(
     input: &'a [AnnotatedWord],
-    lang: &Language,
+    lang: &Personality,
 ) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
-    alt((
-        map(
-            pair(
-                |i| word_with_def(i, WordFunction::Negation),
-                |i| pos_p(i, lang),
+    if thread_rng().gen_bool(lang.negation) {
+        alt((
+            map(
+                pair(
+                    |i| word_with_def(i, WordFunction::Negation),
+                    |i| pos_p(i, lang),
+                ),
+                |(_neg, vp)| vp.reverse(),
             ),
-            |(_neg, vp)| vp.reverse(),
-        ),
-        |i| pos_p(i, lang),
-    ))(input)
+            |i| pos_p(i, lang),
+        ))(input)
+    } else {
+        pos_p(input, lang)
+    }
 }
 
 fn adposition<'a>(
     input: &'a [AnnotatedWord],
-    lang: &Language,
+    lang: &Personality,
 ) -> IResult<&'a [AnnotatedWord], ops::Relative> {
     map(
         pair(
@@ -411,25 +416,33 @@ fn number(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], u32> {
 /// Matches numbered phrases, either "do A, X times" or just "A".
 fn numbered_p<'a>(
     input: &'a [AnnotatedWord],
-    lang: &Language,
+    lang: &Personality,
 ) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
-    alt((
-        map(pair(number, |i| neg_p(i, lang)), |(n, vp)| {
-            Box::new(ops::Repeat(n, vp)) as Box<dyn Operation>
-        }),
-        |i| neg_p(i, lang),
-    ))(input)
+    if thread_rng().gen_bool(lang.numbers) {
+        alt((
+            map(pair(number, |i| neg_p(i, lang)), |(n, vp)| {
+                Box::new(ops::Repeat(n, vp)) as Box<dyn Operation>
+            }),
+            |i| neg_p(i, lang),
+        ))(input)
+    } else {
+        neg_p(input, lang)
+    }
 }
 
 /// Matches prepositional phrases, either "A prep B" or just "A".
 fn pos_p<'a>(
     input: &'a [AnnotatedWord],
-    lang: &Language,
+    lang: &Personality,
 ) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
-    alt((
-        |i| adposition(i, lang).and_then(|(i, r)| clause_new(i, &r, lang)),
-        |i| clause_new(i, &ops::Relative::Top, &lang),
-    ))(input)
+    if thread_rng().gen_bool(lang.adposition) {
+        alt((
+            |i| adposition(i, lang).and_then(|(i, r)| clause_new(i, &r, lang)),
+            |i| clause_new(i, &ops::Relative::Top, lang),
+        ))(input)
+    } else {
+        clause_new(input, &ops::Relative::Top, lang)
+    }
 }
 
 fn greeting<'a>(input: &'a [AnnotatedWord]) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
@@ -443,7 +456,7 @@ fn greeting<'a>(input: &'a [AnnotatedWord]) -> IResult<&'a [AnnotatedWord], Box<
 /// a greeting.
 fn sentence<'a>(
     input: &'a [AnnotatedWord],
-    lang: &Language,
+    lang: &Personality,
 ) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
     alt((|i| conjuncted_phrase(i, lang), greeting))(input)
 }
@@ -453,7 +466,7 @@ fn sentence<'a>(
 pub fn clause_new<'a>(
     input: &'a [AnnotatedWord],
     pos: &ops::Relative,
-    lang: &Language,
+    lang: &Personality,
 ) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
     map(
         pair(
@@ -471,17 +484,18 @@ pub fn clause_new<'a>(
 /// TODO Move around the position of the conjunction.
 fn conjuncted_phrase<'a>(
     input: &'a [AnnotatedWord],
-    lang: &Language,
+    lang: &Personality,
 ) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
-    alt((
-        map(
-            separated_pair(
-                |i| numbered_p(i, lang),
-                |i| word_with_def(i, WordFunction::And),
-                |i| numbered_p(i, lang),
+    let inner = |i| numbered_p(i, lang);
+    if thread_rng().gen_bool(lang.conjunction) {
+        alt((
+            map(
+                separated_pair(inner, |i| word_with_def(i, WordFunction::And), inner),
+                |(a, b)| Box::new(ops::Compound(a, b)) as Box<dyn Operation>,
             ),
-            |(a, b)| Box::new(ops::Compound(a, b)) as Box<dyn Operation>,
-        ),
-        |i| numbered_p(i, lang),
-    ))(input)
+            inner,
+        ))(input)
+    } else {
+        inner(input)
+    }
 }

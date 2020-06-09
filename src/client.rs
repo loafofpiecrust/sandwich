@@ -28,28 +28,12 @@ use futures::{pin_mut, select, FutureExt};
 use grammar::{sentence_new, Dictionary, PhraseNode};
 use std::{thread, time::Duration};
 
-pub struct Language {
-    pub dictionary: Dictionary,
-    pub display: RenderSender,
-}
-impl Language {
-    fn new() -> Self {
-        Self {
-            dictionary: Dictionary::new(),
-            display: setup_display(),
-        }
-    }
-    pub fn render(&self, state: Render) -> anyhow::Result<()> {
-        Ok(self.display.send(state)?)
-    }
-}
-
 pub struct Client {
     /// We'll have a few words with default parts of speech if totally ambiguous.
     pub state: Box<dyn State>,
     behaviors: Vec<Box<dyn Behavior>>,
     pub sandwich: Option<Sandwich>,
-    pub lang: Language,
+    pub lang: Personality,
     encoder: Box<dyn Encoder>,
     last_result: Sandwich,
 }
@@ -59,7 +43,7 @@ impl Client {
             state: Box::new(Idle),
             behaviors: Vec::new(),
             sandwich: None,
-            lang: Language::new(),
+            lang: Personality::new(),
             encoder: Box::new(RelativeEncoder::new(0.8, DesireEncoder)),
             last_result: Sandwich::default(),
         }
@@ -109,23 +93,20 @@ impl Client {
                 }
             }
             // Send over the next operation!
-            let mut op = order.pick_op(&self.last_result);
+            let mut op = order.pick_op(&self.lang, &self.last_result);
 
             if let Some(mut op) = op {
                 // Request two operations at once if planned and not shy.
-                if rng.gen_bool(order.personality.planned)
-                    && !rng.gen_bool(order.personality.shyness)
-                {
-                    let assumed_sandwich =
-                        op.apply(self.last_result.clone(), &mut order.personality);
-                    if let Some(next_op) = order.pick_op(&assumed_sandwich) {
+                if rng.gen_bool(self.lang.planned) && !rng.gen_bool(self.lang.shyness) {
+                    let assumed_sandwich = op.apply(self.last_result.clone(), &mut self.lang);
+                    if let Some(next_op) = order.pick_op(&self.lang, &assumed_sandwich) {
                         op = Box::new(ops::Compound(op, next_op));
                     }
                 }
                 println!("op: {:?}", op);
                 let s = op.encode(&self.lang);
                 self.say_phrase(&s, None).await?;
-                let message = Message::new(Some(s), None);
+                let message = Message::new(Some(s.to_string()), None);
                 message.send(&mut stream).await?;
                 // Wait some time between each of our requests.
                 // TODO Some machines may wait for responses before sending the
@@ -142,7 +123,7 @@ impl Client {
         let op = ops::Finish;
         let s = op.encode(&self.lang);
         self.say_phrase(&s, None).await?;
-        let msg = Message::new(Some(s), None);
+        let msg = Message::new(Some(s.to_string()), None);
         msg.send(&mut stream).await?;
         Ok(())
     }
@@ -173,7 +154,6 @@ impl Client {
             background: Some(color),
         })?;
 
-        let mut personality = Personality::new(&self.lang);
         self.last_result = Sandwich::default();
         loop {
             // TODO This machine might wait to receive multiple operations before applying them all at once.
@@ -184,14 +164,14 @@ impl Client {
                 .expect("Failed to parse phrase");
 
             // If spite is high enough, do the opposite of their order.
-            if rng.gen_bool(personality.spite) {
+            if rng.gen_bool(self.lang.spite) {
                 op = op.reverse();
                 // Feel the release of anger calm you.
-                personality.spite = 0.0;
+                self.lang.spite = 0.0;
             }
 
             // Apply the operation to our sandwich.
-            take(&mut self.last_result, |s| op.apply(s, &mut personality));
+            self.last_result = op.apply(self.last_result.clone(), &mut self.lang);
 
             // TODO Say response too? Render upon saying a response?
             self.lang.render(Render {
@@ -294,7 +274,7 @@ impl Client {
         // stream: &mut TcpStream,
     ) -> anyhow::Result<()> {
         println!("saying {}", phrase);
-        println!("{:?}", self.parse(phrase));
+        // println!("{:?}", self.parse(phrase));
         println!("with sandwich {:?}", sandwich);
 
         // let mut buf = [0; 512];
@@ -346,7 +326,7 @@ impl Client {
         // }
         // (response, sandwich)
     }
-    pub fn parse(&self, input: &str) -> Option<Box<dyn Operation>> {
+    pub fn parse(&mut self, input: &str) -> Option<Box<dyn Operation>> {
         sentence_new(input.as_bytes(), &self.lang)
     }
     pub fn lex(&self, input: &str) -> Option<Vec<grammar::AnnotatedWord>> {

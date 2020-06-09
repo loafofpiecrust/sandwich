@@ -1,6 +1,6 @@
 mod allergy;
 pub mod ops;
-mod personality;
+pub mod personality;
 
 // Re-export everything from behavior submodules.
 pub use allergy::*;
@@ -8,7 +8,6 @@ pub use ops::*;
 pub use personality::*;
 
 use crate::{
-    client::Language,
     grammar::{self, AnnotatedWord, PhraseNode, WordFunction, WordRole},
     sandwich::Sandwich,
 };
@@ -81,10 +80,10 @@ impl Behavior for Forgetful {
 /// TODO Give this two traits! One for parsing, one for encoding!!
 /// Each encoder may implement new parsing/encoding features for the language.
 pub trait Encoder {
-    fn encode(&mut self, lang: &Language, item: PositionedIngredient) -> String;
+    fn encode(&mut self, lang: &Personality, item: PositionedIngredient) -> String;
     /// Given a phrase and a sandwich, produce the next step of the sandwich.
     /// Most basic version: find the object of the phrase, add that to the sandwich.
-    fn decode(&mut self, phrase: &PhraseNode, sandwich: &mut Sandwich, lang: &Language) -> bool;
+    fn decode(&mut self, phrase: &PhraseNode, sandwich: &mut Sandwich, lang: &Personality) -> bool;
     fn noun_phrase<'a>(
         &self,
         input: &'a [AnnotatedWord],
@@ -94,7 +93,7 @@ pub trait Encoder {
 /// A root encoder.
 pub struct DesireEncoder;
 impl Encoder for DesireEncoder {
-    fn encode(&mut self, context: &Language, item: PositionedIngredient) -> String {
+    fn encode(&mut self, context: &Personality, item: PositionedIngredient) -> String {
         let ingredient = &item.sandwich.ingredients[item.index];
         let obj = context
             .dictionary
@@ -111,7 +110,7 @@ impl Encoder for DesireEncoder {
     ) -> IResult<&'a [AnnotatedWord], PhraseNode> {
         map(grammar::noun, |n| PhraseNode::NounPhrase(vec![n]))(input)
     }
-    fn decode(&mut self, phrase: &PhraseNode, sandwich: &mut Sandwich, lang: &Language) -> bool {
+    fn decode(&mut self, phrase: &PhraseNode, sandwich: &mut Sandwich, lang: &Personality) -> bool {
         match phrase.main_verb().and_then(|v| v.definition()) {
             Some(WordFunction::Desire) => {
                 let word = phrase.object();
@@ -137,11 +136,11 @@ impl Encoder for DesireEncoder {
 
 pub struct NegativeEncoder;
 impl Encoder for NegativeEncoder {
-    fn encode(&mut self, lang: &Language, item: PositionedIngredient) -> String {
+    fn encode(&mut self, lang: &Personality, item: PositionedIngredient) -> String {
         // TODO How do we know what we don't want?
         todo!()
     }
-    fn decode(&mut self, phrase: &PhraseNode, sandwich: &mut Sandwich, lang: &Language) -> bool {
+    fn decode(&mut self, phrase: &PhraseNode, sandwich: &mut Sandwich, lang: &Personality) -> bool {
         todo!()
     }
     fn noun_phrase<'a>(
@@ -187,7 +186,7 @@ impl RelativeEncoder {
     }
 }
 impl Encoder for RelativeEncoder {
-    fn encode(&mut self, context: &Language, item: PositionedIngredient) -> String {
+    fn encode(&mut self, context: &Personality, item: PositionedIngredient) -> String {
         let last_order = *item.history.last().unwrap_or(&0);
         println!("Encoding relative maybe? {:?}", item);
         if item.index != last_order && item.index != last_order + 1 {
@@ -278,7 +277,7 @@ impl Encoder for RelativeEncoder {
     }
     // TODO Make a DecodeError or DecodeResult type to represent either Completed,
     // Success, or Failure.
-    fn decode(&mut self, phrase: &PhraseNode, sandwich: &mut Sandwich, lang: &Language) -> bool {
+    fn decode(&mut self, phrase: &PhraseNode, sandwich: &mut Sandwich, lang: &Personality) -> bool {
         // Even if we successfully parse a positional phrase,
         // there's a chance we miss it.
         if thread_rng().gen_bool(self.accuracy) {
