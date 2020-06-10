@@ -69,7 +69,9 @@ impl Personality {
         deg(&mut self.numbers)
     }
     pub fn upgrade_skill(x: &mut f64) {
+        let orig = *x;
         *x = (*x + ((*x * 100.0).ln()) / 100.0).min(1.0);
+        println!("Upgraded language skill from {} => {}", orig, *x);
     }
     pub fn render(&self, state: Render) -> anyhow::Result<()> {
         Ok(self.display.send(state)?)
