@@ -97,7 +97,10 @@ impl Client {
 
             if let Some(mut op) = op {
                 // Request two operations at once if planned and not shy.
-                if rng.gen_bool(self.lang.planned) && !rng.gen_bool(self.lang.shyness) {
+                if rng.gen_bool(self.lang.planned)
+                    && !rng.gen_bool(self.lang.shyness)
+                    && rng.gen_bool(self.lang.conjunction)
+                {
                     let assumed_sandwich = op.apply(self.last_result.clone(), &mut self.lang);
                     if let Some(next_op) = order.pick_op(&self.lang, &assumed_sandwich) {
                         op = Box::new(ops::Compound(op, next_op));

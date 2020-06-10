@@ -312,7 +312,10 @@ impl Order {
             .take(next_idx)
             .position(|x| !result.ingredients.contains(x));
         // If we aren't shy, try to correct a mistake!
-        if mistake.is_some() && !rng.gen_bool(personality.shyness) {
+        if mistake.is_some()
+            && !rng.gen_bool(personality.shyness)
+            && rng.gen_bool(personality.adposition)
+        {
             let idx = mistake.unwrap();
             // Pick a preposition to position the missing ingredient where we'd like it.
             // TODO If this machine doesn't care about ordering, then just ask to add it to the end.
@@ -354,7 +357,10 @@ impl Order {
         if let Some(allergen) = allergen {
             // If the allergy is severe and we aren't shy about it, ask for that
             // ingredient to be removed.
-            if rng.gen_bool(allergen.severity) && !rng.gen_bool(personality.shyness) {
+            if rng.gen_bool(allergen.severity)
+                && !rng.gen_bool(personality.shyness)
+                && rng.gen_bool(personality.negation)
+            {
                 return Some(Box::new(Remove(allergen.ingredient.clone())));
             }
         }
@@ -398,7 +404,7 @@ impl Order {
                 .skip(next_idx) // If we want index 1, skip just the zeroth.
                 .take_while(|x| x == &next_ingr)
                 .count();
-            if same_count > 1 {
+            if same_count > 1 && rng.gen_bool(personality.numbers) {
                 Box::new(Repeat(same_count as u32, adder)) as Box<dyn Operation>
             } else {
                 // Default behavior, just add the next ingredient to the top of the sandwich.
