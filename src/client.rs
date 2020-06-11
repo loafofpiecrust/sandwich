@@ -255,7 +255,7 @@ impl Client {
             let request: String = {
                 let mut buf = [0; 512];
                 stream.read(&mut buf).await?;
-                dbg!(bincode::deserialize(&buf)?)
+                bincode::deserialize(&buf)?
             };
             let sandwich: Option<Sandwich> = {
                 let mut buf = [0; 512];

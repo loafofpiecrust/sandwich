@@ -201,7 +201,7 @@ pub fn annotate(phrase: Phrase, context: &Personality) -> AnnotatedPhrase {
 
 pub fn sentence_new(input: &[u8], lang: &Personality) -> Option<Box<dyn Operation>> {
     phrase(input).ok().and_then(|(_, parsed)| {
-        let tagged = std::dbg!(annotate(std::dbg!(parsed), lang));
+        let tagged = annotate(parsed, lang);
         if let Ok((_, op)) = sentence(&tagged, lang) {
             Some(op)
         } else {
