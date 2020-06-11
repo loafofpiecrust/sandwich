@@ -163,44 +163,44 @@ impl Client {
             // TODO This machine might wait to receive multiple operations before applying them all at once.
             let msg = Message::recv(&mut stream).await?;
             std::dbg!(&msg);
-            let mut op = self
-                .parse(&msg.text.unwrap())
-                .expect("Failed to parse phrase");
+            if let Some(mut op) = self.parse(&msg.text.unwrap()) {
+                // Apply all persistent operations at every turn.
+                for passive_op in &persistent_ops {
+                    self.last_result = passive_op.apply(self.last_result.clone(), &mut self.lang);
+                }
 
-            // Apply all persistent operations at every turn.
-            for passive_op in &persistent_ops {
-                self.last_result = passive_op.apply(self.last_result.clone(), &mut self.lang);
+                // If spite is high enough, do the opposite of their order.
+                if rng.gen_bool(self.lang.spite) {
+                    op = op.reverse();
+                    // Feel the release of anger calm you.
+                    self.lang.spite = 0.0;
+                }
+
+                // Apply the operation to our sandwich.
+                self.last_result = op.apply(self.last_result.clone(), &mut self.lang);
+
+                if op.is_persistent() {
+                    persistent_ops.push(op);
+                }
+
+                // TODO Say response too? Render upon saying a response?
+                self.lang.render(Render {
+                    subtitles: None,
+                    ingredients: Some(self.last_result.ingredients.clone()),
+                    background: None,
+                })?;
+
+                // Only break the loop when the order is complete.
+                if self.last_result.complete {
+                    break;
+                }
+
+                // Send the current sandwich status back over!
+                let new_msg = Message::new(None, Some(self.last_result.clone()));
+                new_msg.send(&mut stream).await?;
+            } else {
+                println!("Failed to parse phrase")
             }
-
-            // If spite is high enough, do the opposite of their order.
-            if rng.gen_bool(self.lang.spite) {
-                op = op.reverse();
-                // Feel the release of anger calm you.
-                self.lang.spite = 0.0;
-            }
-
-            // Apply the operation to our sandwich.
-            self.last_result = op.apply(self.last_result.clone(), &mut self.lang);
-
-            if op.is_persistent() {
-                persistent_ops.push(op);
-            }
-
-            // TODO Say response too? Render upon saying a response?
-            self.lang.render(Render {
-                subtitles: None,
-                ingredients: Some(self.last_result.ingredients.clone()),
-                background: None,
-            })?;
-
-            // Only break the loop when the order is complete.
-            if self.last_result.complete {
-                break;
-            }
-
-            // Send the current sandwich status back over!
-            let new_msg = Message::new(None, Some(self.last_result.clone()));
-            new_msg.send(&mut stream).await?;
         }
 
         println!("The order is finished!");
