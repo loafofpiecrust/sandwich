@@ -43,19 +43,24 @@ impl Client {
             state: Box::new(Idle),
             behaviors: Vec::new(),
             sandwich: None,
-            lang: Personality::new(),
+            // Make a new personality if there's none saved.
+            lang: Personality::load().unwrap_or_else(|_| Personality::new()),
             encoder: Box::new(RelativeEncoder::new(0.8, DesireEncoder)),
             last_result: Sandwich::default(),
         }
     }
 
     pub async fn connect_with_peer(&mut self) -> anyhow::Result<()> {
-        let client = comm::find_peer().fuse();
-        let server = comm::wait_for_peer().fuse();
-        pin_mut!(client, server);
-        select! {
-            s = client => self.new_customer(s.0?, s.1).await,
-            s = server => self.new_server(s.0?, s.1).await,
+        // Keep doing sandwich interactions forever.
+        loop {
+            let client = comm::find_peer().fuse();
+            let server = comm::wait_for_peer().fuse();
+            pin_mut!(client, server);
+            let r = select! {
+                s = client => self.new_customer(s.0?, s.1).await,
+                s = server => self.new_server(s.0?, s.1).await,
+            };
+            r?;
         }
     }
 
@@ -85,6 +90,9 @@ impl Client {
         let (msg_sx, mut msg_rx) = channel(1);
         let recv_task = task::spawn(Self::receives_msgs(stream.clone(), msg_sx));
         loop {
+            // Save our personality frequently.
+            self.lang.save()?;
+
             // TODO Handle the Err case here by breaking the loop.
             if let Ok(msg) = msg_rx.try_next() {
                 println!("received {:?}", msg);
@@ -160,6 +168,9 @@ impl Client {
         let mut persistent_ops = Vec::<Box<dyn Operation>>::new();
         self.last_result = Sandwich::default();
         loop {
+            // Save our personality frequently.
+            self.lang.save()?;
+
             // TODO This machine might wait to receive multiple operations before applying them all at once.
             let msg = Message::recv(&mut stream).await?;
             std::dbg!(&msg);

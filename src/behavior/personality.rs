@@ -3,7 +3,10 @@ use crate::{
     grammar::Dictionary,
     sandwich::Ingredient,
 };
+use serde::{Deserialize, Serialize};
+use std::{fs::File, io::prelude::*};
 
+#[derive(Serialize, Deserialize)]
 pub struct Personality {
     /// Likeliness to make mistakes building an order, to fail to remove allergens.
     pub laziness: f64,
@@ -26,7 +29,9 @@ pub struct Personality {
     pub adposition: f64,
     pub conjunction: f64,
     pub numbers: f64,
+    #[serde(skip, default = "Dictionary::new")]
     pub dictionary: Dictionary,
+    #[serde(skip, default = "setup_display")]
     pub display: RenderSender,
 }
 impl Personality {
@@ -34,11 +39,11 @@ impl Personality {
         let dictionary = Dictionary::new();
         Self {
             display: setup_display(),
-            planned: 0.3,
+            planned: 0.8,
             laziness: 0.5,
             forgetfulness: 0.1,
-            politeness: 0.5,
-            shyness: 0.2,
+            politeness: 0.3,
+            shyness: 0.1,
             spite: 0.0,
             order_sensitivity: 1.0,
             spontaneity: 0.1,
@@ -57,6 +62,14 @@ impl Personality {
             numbers: 0.1,
             dictionary,
         }
+    }
+    pub fn load() -> anyhow::Result<Self> {
+        let f = File::open("personality.yaml")?;
+        Ok(serde_yaml::from_reader(&f)?)
+    }
+    pub fn save(&self) -> anyhow::Result<()> {
+        let mut f = File::create("personality.yaml")?;
+        Ok(serde_yaml::to_writer(f, self)?)
     }
     pub fn degrade_language_skills(&mut self) {
         let factor = 6.0;
@@ -78,6 +91,7 @@ impl Personality {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Allergy {
     pub ingredient: Ingredient,
     pub severity: f64,
