@@ -7,6 +7,7 @@ use crate::{
     comm,
     display::{setup_display, Render, RenderSender},
     grammar,
+    grammar::Parsed,
     grammar::WordFunction,
     sandwich::Sandwich,
     state::{Idle, OrderingSandwich, State},
@@ -174,7 +175,7 @@ impl Client {
             // TODO This machine might wait to receive multiple operations before applying them all at once.
             let msg = Message::recv(&mut stream).await?;
             std::dbg!(&msg);
-            if let Some(mut op) = self.parse(&msg.text.unwrap()) {
+            if let Some((mut op, lang_change)) = self.parse(&msg.text.unwrap()) {
                 // Apply all persistent operations at every turn.
                 for passive_op in &persistent_ops {
                     self.last_result = passive_op.apply(self.last_result.clone(), &mut self.lang);
@@ -189,6 +190,7 @@ impl Client {
 
                 // Apply the operation to our sandwich.
                 self.last_result = op.apply(self.last_result.clone(), &mut self.lang);
+                self.lang.apply_upgrade(lang_change);
 
                 if op.is_persistent() {
                     persistent_ops.push(op);
@@ -350,7 +352,7 @@ impl Client {
         // }
         // (response, sandwich)
     }
-    pub fn parse(&mut self, input: &str) -> Option<Box<dyn Operation>> {
+    pub fn parse(&mut self, input: &str) -> Option<Parsed> {
         sentence_new(input.as_bytes(), &self.lang)
     }
     pub fn lex(&self, input: &str) -> Option<Vec<grammar::AnnotatedWord>> {

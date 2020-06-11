@@ -45,16 +45,11 @@ impl Operation for Add {
     fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
         let mut ingr = sandwich.ingredients;
         let idx = match &self.1 {
-            Relative::Before(other) => {
-                Personality::upgrade_skill(&mut personality.adposition);
-                ingr.iter().position(|x| x.name == other.name)
-            }
-            Relative::After(other) => {
-                Personality::upgrade_skill(&mut personality.adposition);
-                ingr.iter()
-                    .position(|x| x.name == other.name)
-                    .map(|x| x + 1)
-            }
+            Relative::Before(other) => ingr.iter().position(|x| x.name == other.name),
+            Relative::After(other) => ingr
+                .iter()
+                .position(|x| x.name == other.name)
+                .map(|x| x + 1),
             Relative::Top => Some(ingr.len()),
         };
         if let Some(idx) = idx {
@@ -97,7 +92,7 @@ impl Operation for Add {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Relative {
     Before(Ingredient),
     After(Ingredient),
@@ -124,7 +119,6 @@ impl Operation for Remove {
         }
         // Ingredient removal raises spite!
         personality.spite += 0.1;
-        Personality::upgrade_skill(&mut personality.adverbs);
         Sandwich {
             ingredients,
             ..sandwich
@@ -152,7 +146,6 @@ impl Operation for RemoveAll {
         }
         // Ingredient removal raises spite!
         personality.spite += 0.1;
-        Personality::upgrade_skill(&mut personality.adverbs);
         Sandwich {
             ingredients,
             ..sandwich
@@ -195,7 +188,6 @@ impl Operation for Finish {
 pub struct Repeat(pub u32, pub Box<dyn Operation>);
 impl Operation for Repeat {
     fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
-        Personality::upgrade_skill(&mut personality.numbers);
         let mut sandwich = sandwich;
         for _ in 0..self.0 {
             sandwich = self.1.apply(sandwich, personality);
@@ -219,7 +211,6 @@ impl Operation for Repeat {
 pub struct Compound(pub Box<dyn Operation>, pub Box<dyn Operation>);
 impl Operation for Compound {
     fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
-        Personality::upgrade_skill(&mut personality.conjunction);
         // Apply the inner operations sequentially.
         self.1
             .apply(self.0.apply(sandwich, personality), personality)

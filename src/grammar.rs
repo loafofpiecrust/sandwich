@@ -1,4 +1,4 @@
-use crate::behavior::{ops, Operation};
+use crate::behavior::{ops, Language, Operation};
 use crate::{behavior::personality::Personality, sandwich::Ingredient};
 use itertools::Itertools;
 use nom::{branch::*, bytes::complete::*, combinator::*, multi::*, sequence::*, IResult, *};
@@ -199,7 +199,7 @@ pub fn annotate(phrase: Phrase, context: &Personality) -> AnnotatedPhrase {
     result
 }
 
-pub fn sentence_new(input: &[u8], lang: &Personality) -> Option<Box<dyn Operation>> {
+pub fn sentence_new(input: &[u8], lang: &Personality) -> Option<Parsed> {
     phrase(input).ok().and_then(|(_, parsed)| {
         let tagged = annotate(parsed, lang);
         if let Ok((_, op)) = sentence(&tagged, lang) {
@@ -380,12 +380,12 @@ pub fn word_with_role(
 fn adv_p<'a>(
     input: &'a [AnnotatedWord],
     lang: &Personality,
-) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
+) -> IResult<&'a [AnnotatedWord], Parsed> {
     alt((
         map(
             pair(|i| word_with_role(i, WordRole::Adverb), |i| adv_p(i, lang)),
-            |(adv, vp)| {
-                if thread_rng().gen_bool(lang.adverbs) {
+            |(adv, (vp, vp_l))| {
+                let op = if thread_rng().gen_bool(lang.adverbs) {
                     match adv.definition() {
                         Some(WordFunction::Ever) => {
                             Box::new(ops::Persist(vp)) as Box<dyn Operation>
@@ -395,7 +395,14 @@ fn adv_p<'a>(
                     }
                 } else {
                     vp
-                }
+                };
+                (
+                    op,
+                    Language {
+                        adverbs: vp_l.adverbs + 1,
+                        ..vp_l
+                    },
+                )
             },
         ),
         |i| pos_p(i, lang),
@@ -422,18 +429,30 @@ fn number(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], u32> {
     )(input)
 }
 
+pub type Parsed = (Box<dyn Operation>, Language);
+// struct Parsed {
+//     op: Box<dyn Operation>,
+//     lang: Language,
+// }
+
 /// Matches numbered phrases, either "do A, X times" or just "A".
 fn numbered_p<'a>(
     input: &'a [AnnotatedWord],
     lang: &Personality,
-) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
+) -> IResult<&'a [AnnotatedWord], Parsed> {
     alt((
-        map(pair(number, |i| numbered_p(i, lang)), |(n, vp)| {
-            if thread_rng().gen_bool(lang.numbers) {
-                Box::new(ops::Repeat(n, vp)) as Box<dyn Operation>
-            } else {
-                vp
-            }
+        map(pair(number, |i| numbered_p(i, lang)), |(n, (vp, l))| {
+            (
+                if thread_rng().gen_bool(lang.numbers) {
+                    Box::new(ops::Repeat(n, vp)) as Box<dyn Operation>
+                } else {
+                    vp
+                },
+                Language {
+                    numbers: l.numbers + 1,
+                    ..l
+                },
+            )
         }),
         |i| adv_p(i, lang),
     ))(input)
@@ -443,21 +462,29 @@ fn numbered_p<'a>(
 fn pos_p<'a>(
     input: &'a [AnnotatedWord],
     lang: &Personality,
-) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
+) -> IResult<&'a [AnnotatedWord], Parsed> {
     if thread_rng().gen_bool(lang.adposition) {
         alt((
             |i| adposition(i, lang).and_then(|(i, r)| clause_new(i, &r, lang)),
             |i| clause_new(i, &ops::Relative::Top, lang),
         ))(input)
     } else {
-        clause_new(input, &ops::Relative::Top, lang)
+        // Skip over the adposition if we don't understand it.
+        preceded(opt(|i| adposition(i, lang)), |i| {
+            clause_new(i, &ops::Relative::Top, lang)
+        })(input)
     }
 }
 
-fn greeting<'a>(input: &'a [AnnotatedWord]) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
+fn greeting<'a>(input: &'a [AnnotatedWord]) -> IResult<&'a [AnnotatedWord], Parsed> {
     map(
         |i| word_with_def(i, WordFunction::Greeting),
-        |_| Box::new(ops::Finish) as Box<dyn Operation>,
+        |_| {
+            (
+                Box::new(ops::Finish) as Box<dyn Operation>,
+                Language::default(),
+            )
+        },
     )(input)
 }
 
@@ -466,25 +493,33 @@ fn greeting<'a>(input: &'a [AnnotatedWord]) -> IResult<&'a [AnnotatedWord], Box<
 fn sentence<'a>(
     input: &'a [AnnotatedWord],
     lang: &Personality,
-) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
+) -> IResult<&'a [AnnotatedWord], Parsed> {
     alt((|i| conjuncted_phrase(i, lang), greeting))(input)
 }
 
 /// VP -> (NP) V
-// TODO Add probability to understand preposition.
 pub fn clause_new<'a>(
     input: &'a [AnnotatedWord],
     pos: &ops::Relative,
     lang: &Personality,
-) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
+) -> IResult<&'a [AnnotatedWord], Parsed> {
     map(
         pair(
             |i| ingredient(i, lang),
             |i| word_with_role(i, WordRole::Verb),
         ),
         |(np, v)| match v.definition() {
-            Some(WordFunction::Desire) => Box::new(ops::Add(np, pos.clone())) as Box<dyn Operation>,
-            Some(WordFunction::Have) => Box::new(ops::Ensure(np)) as Box<dyn Operation>,
+            Some(WordFunction::Desire) => (
+                Box::new(ops::Add(np, pos.clone())) as Box<dyn Operation>,
+                Language {
+                    adposition: if *pos == ops::Relative::Top { 0 } else { 1 },
+                    ..Default::default()
+                },
+            ),
+            Some(WordFunction::Have) => (
+                Box::new(ops::Ensure(np)) as Box<dyn Operation>,
+                Language::default(),
+            ),
             _ => todo!("This verb hasn't been mapped to an operation yet."),
         },
     )(input)
@@ -495,7 +530,7 @@ pub fn clause_new<'a>(
 fn conjuncted_phrase<'a>(
     input: &'a [AnnotatedWord],
     lang: &Personality,
-) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
+) -> IResult<&'a [AnnotatedWord], Parsed> {
     let inner = |i| numbered_p(i, lang);
     alt((
         map(
@@ -505,12 +540,20 @@ fn conjuncted_phrase<'a>(
                 // Allow recursion on conjunctions for X and (X and X), etc.
                 |i| conjuncted_phrase(i, lang),
             ),
-            |(a, b)| {
-                if thread_rng().gen_bool(lang.conjunction) {
+            |((a, a_l), (b, b_l))| {
+                let op = if thread_rng().gen_bool(lang.conjunction) {
                     Box::new(ops::Compound(a, b)) as Box<dyn Operation>
                 } else {
                     b
-                }
+                };
+                (
+                    op,
+                    a_l + b_l
+                        + Language {
+                            conjunction: 1,
+                            ..Default::default()
+                        },
+                )
             },
         ),
         inner,

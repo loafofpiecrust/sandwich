@@ -6,6 +6,26 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::{fs::File, io::prelude::*};
 
+#[derive(Default)]
+pub struct Language {
+    // Weights for grammar rules!
+    pub adverbs: u32,
+    pub adposition: u32,
+    pub conjunction: u32,
+    pub numbers: u32,
+}
+impl std::ops::Add for Language {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
+            adverbs: self.adverbs + rhs.adverbs,
+            adposition: self.adposition + rhs.adposition,
+            conjunction: self.conjunction + rhs.conjunction,
+            numbers: self.numbers + rhs.numbers,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Personality {
     /// Likeliness to make mistakes building an order, to fail to remove allergens.
@@ -80,6 +100,21 @@ impl Personality {
         deg(&mut self.adposition);
         deg(&mut self.conjunction);
         deg(&mut self.numbers)
+    }
+    pub fn apply_upgrade(&mut self, lang: Language) {
+        // TODO Apply downgrades too?
+        for _ in 0..lang.adposition {
+            Self::upgrade_skill(&mut self.adposition)
+        }
+        for _ in 0..lang.numbers {
+            Self::upgrade_skill(&mut self.numbers)
+        }
+        for _ in 0..lang.adverbs {
+            Self::upgrade_skill(&mut self.adverbs)
+        }
+        for _ in 0..lang.conjunction {
+            Self::upgrade_skill(&mut self.conjunction)
+        }
     }
     pub fn upgrade_skill(x: &mut f64) {
         let orig = *x;

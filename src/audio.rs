@@ -5,13 +5,15 @@ use itertools::Itertools;
 use rodio::{self, Sink};
 use std::{thread, time::Duration};
 
+const VOLUME: f32 = 0.4;
+
 pub fn play_sound(frequencies: (u32, u32), duration: Duration) -> anyhow::Result<()> {
     let device = rodio::default_output_device().unwrap();
     let sink1 = Sink::new(&device);
     let sink2 = Sink::new(&device);
 
-    sink1.set_volume(0.5);
-    sink2.set_volume(0.5);
+    sink1.set_volume(VOLUME);
+    sink2.set_volume(VOLUME);
     // Play two sine waves at once for dual-tone effect.
     sink1.append(SawtoothWave::new(frequencies.0));
     sink2.append(rodio::source::SineWave::new(frequencies.1));
