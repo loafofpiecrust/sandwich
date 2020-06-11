@@ -124,7 +124,7 @@ impl Operation for Remove {
         }
         // Ingredient removal raises spite!
         personality.spite += 0.1;
-        Personality::upgrade_skill(&mut personality.negation);
+        Personality::upgrade_skill(&mut personality.adverbs);
         Sandwich {
             ingredients,
             ..sandwich
@@ -136,6 +136,33 @@ impl Operation for Remove {
     fn encode(&self, lang: &Personality) -> String {
         let neg = lang.dictionary.word_for_def(WordFunction::Negation);
         format!("{} {}", neg.0, self.reverse().encode(lang))
+    }
+    fn is_persistent(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug)]
+pub struct RemoveAll(Ingredient);
+impl Operation for RemoveAll {
+    fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
+        let mut ingredients = sandwich.ingredients;
+        while let Some(idx) = ingredients.iter().position(|x| x.name == self.0.name) {
+            ingredients.remove(idx);
+        }
+        // Ingredient removal raises spite!
+        personality.spite += 0.1;
+        Personality::upgrade_skill(&mut personality.adverbs);
+        Sandwich {
+            ingredients,
+            ..sandwich
+        }
+    }
+    fn reverse(&self) -> Box<dyn Operation> {
+        Box::new(Ensure(self.0.clone()))
+    }
+    fn encode(&self, lang: &Personality) -> String {
+        todo!()
     }
     fn is_persistent(&self) -> bool {
         false
@@ -211,38 +238,15 @@ impl Operation for Compound {
     }
 }
 
-/// Applies to (roughly) the duration of an order, and means this ingredient
-/// should never be added to the sandwich. Expressed with allergen terminology.
-#[derive(Debug)]
-pub struct NeverAdd(pub Ingredient);
-impl Operation for NeverAdd {
-    fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
-        todo!()
-    }
-    fn reverse(&self) -> Box<dyn Operation> {
-        Box::new(Ensure(self.0.clone()))
-    }
-    fn encode(&self, lang: &Personality) -> String {
-        // adjective: "I am allgergic to X"
-        // or noun: "X is an allergy"
-        // or verb: "I react to X"
-        // or reverse verb: "X causes reaction"
-        // or simply: "I can't have X"
-        todo!()
-    }
-    fn is_persistent(&self) -> bool {
-        false
-    }
-}
-
+/// A no-op that exists only as a foil to RemoveAll.
 #[derive(Debug)]
 pub struct Ensure(pub Ingredient);
 impl Operation for Ensure {
     fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
-        todo!()
+        sandwich
     }
     fn reverse(&self) -> Box<dyn Operation> {
-        Box::new(NeverAdd(self.0.clone()))
+        Box::new(RemoveAll(self.0.clone()))
     }
     fn encode(&self, lang: &Personality) -> String {
         todo!()
@@ -252,6 +256,8 @@ impl Operation for Ensure {
     }
 }
 
+/// Applies to (roughly) the duration of an order, and means this ingredient
+/// should never be added to the sandwich. Expressed with allergen terminology.
 #[derive(Debug)]
 pub struct Persist(pub Box<dyn Operation>);
 impl Operation for Persist {
@@ -371,7 +377,7 @@ impl Order {
         // If we aren't shy, try to correct a mistake!
         if mistake.is_some()
             && !rng.gen_bool(personality.shyness)
-            && rng.gen_bool(personality.adposition)
+            && rng.gen_bool(personality.adposition * 2.0)
         {
             let idx = mistake.unwrap();
             // Pick a preposition to position the missing ingredient where we'd like it.
@@ -416,7 +422,7 @@ impl Order {
             // ingredient to be removed.
             if rng.gen_bool(allergen.severity)
                 && !rng.gen_bool(personality.shyness)
-                && rng.gen_bool(personality.negation)
+                && rng.gen_bool(personality.adverbs * 2.0)
             {
                 return Some(Box::new(Remove(allergen.ingredient.clone())));
             }
@@ -461,7 +467,7 @@ impl Order {
                 .skip(next_idx) // If we want index 1, skip just the zeroth.
                 .take_while(|x| x == &next_ingr)
                 .count();
-            if same_count > 1 && rng.gen_bool(personality.numbers) {
+            if same_count > 1 && rng.gen_bool(personality.numbers * 2.0) {
                 Box::new(Repeat(same_count as u32, adder)) as Box<dyn Operation>
             } else {
                 // Default behavior, just add the next ingredient to the top of the sandwich.

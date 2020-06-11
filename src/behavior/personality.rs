@@ -22,7 +22,7 @@ pub struct Personality {
     pub allergies: Vec<Allergy>,
     pub favorites: Vec<Allergy>,
     // Weights for grammar rules!
-    pub negation: f64,
+    pub adverbs: f64,
     pub adposition: f64,
     pub conjunction: f64,
     pub numbers: f64,
@@ -51,7 +51,7 @@ impl Personality {
                 ingredient: dictionary.ingredients.random().clone(),
             }],
             // Grammar rule weights
-            negation: 0.1,
+            adverbs: 0.1,
             adposition: 0.1,
             conjunction: 0.1,
             numbers: 0.1,
@@ -63,7 +63,7 @@ impl Personality {
         let deg = |x: &mut f64| {
             *x = (*x - ((*x * 100.0).ln()) / (factor * 100.0)).max(0.0);
         };
-        deg(&mut self.negation);
+        deg(&mut self.adverbs);
         deg(&mut self.adposition);
         deg(&mut self.conjunction);
         deg(&mut self.numbers)

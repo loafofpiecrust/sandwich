@@ -381,21 +381,25 @@ fn adv_p<'a>(
     input: &'a [AnnotatedWord],
     lang: &Personality,
 ) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
-    if thread_rng().gen_bool(lang.negation) {
-        alt((
-            map(
-                pair(|i| word_with_role(i, WordRole::Adverb), |i| adv_p(i, lang)),
-                |(adv, vp)| match adv.definition() {
-                    Some(WordFunction::Ever) => Box::new(ops::Persist(vp)) as Box<dyn Operation>,
-                    Some(WordFunction::Negation) => vp.reverse(),
-                    _ => todo!(),
-                },
-            ),
-            |i| pos_p(i, lang),
-        ))(input)
-    } else {
-        pos_p(input, lang)
-    }
+    alt((
+        map(
+            pair(|i| word_with_role(i, WordRole::Adverb), |i| adv_p(i, lang)),
+            |(adv, vp)| {
+                if thread_rng().gen_bool(lang.adverbs) {
+                    match adv.definition() {
+                        Some(WordFunction::Ever) => {
+                            Box::new(ops::Persist(vp)) as Box<dyn Operation>
+                        }
+                        Some(WordFunction::Negation) => vp.reverse(),
+                        _ => todo!(),
+                    }
+                } else {
+                    vp
+                }
+            },
+        ),
+        |i| pos_p(i, lang),
+    ))(input)
 }
 
 fn adposition<'a>(
@@ -423,16 +427,16 @@ fn numbered_p<'a>(
     input: &'a [AnnotatedWord],
     lang: &Personality,
 ) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
-    if thread_rng().gen_bool(lang.numbers) {
-        alt((
-            map(pair(number, |i| numbered_p(i, lang)), |(n, vp)| {
+    alt((
+        map(pair(number, |i| numbered_p(i, lang)), |(n, vp)| {
+            if thread_rng().gen_bool(lang.numbers) {
                 Box::new(ops::Repeat(n, vp)) as Box<dyn Operation>
-            }),
-            |i| adv_p(i, lang),
-        ))(input)
-    } else {
-        adv_p(input, lang)
-    }
+            } else {
+                vp
+            }
+        }),
+        |i| adv_p(i, lang),
+    ))(input)
 }
 
 /// Matches prepositional phrases, either "A prep B" or just "A".
@@ -493,20 +497,22 @@ fn conjuncted_phrase<'a>(
     lang: &Personality,
 ) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
     let inner = |i| numbered_p(i, lang);
-    if thread_rng().gen_bool(lang.conjunction) {
-        alt((
-            map(
-                separated_pair(
-                    inner,
-                    |i| word_with_def(i, WordFunction::And),
-                    // Allow recursion on conjunctions for X and (X and X), etc.
-                    |i| conjuncted_phrase(i, lang),
-                ),
-                |(a, b)| Box::new(ops::Compound(a, b)) as Box<dyn Operation>,
+    alt((
+        map(
+            separated_pair(
+                inner,
+                |i| word_with_def(i, WordFunction::And),
+                // Allow recursion on conjunctions for X and (X and X), etc.
+                |i| conjuncted_phrase(i, lang),
             ),
-            inner,
-        ))(input)
-    } else {
-        inner(input)
-    }
+            |(a, b)| {
+                if thread_rng().gen_bool(lang.conjunction) {
+                    Box::new(ops::Compound(a, b)) as Box<dyn Operation>
+                } else {
+                    b
+                }
+            },
+        ),
+        inner,
+    ))(input)
 }
