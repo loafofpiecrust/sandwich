@@ -357,7 +357,9 @@ fn word_with_def(
         .and_then(|i| i.entry.as_ref())
         .map(|e| e.function)
     {
-        return Ok((&input[1..], &input[0]));
+        if d == def {
+            return Ok((&input[1..], &input[0]));
+        }
     }
     Err(nom::Err::Error((input, nom::error::ErrorKind::IsA)))
 }

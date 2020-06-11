@@ -93,7 +93,7 @@ impl Client {
                 }
             }
             // Send over the next operation!
-            let mut op = order.pick_op(&self.lang, &self.last_result);
+            let op = order.pick_op(&self.lang, &self.last_result);
 
             if let Some(mut op) = op {
                 // Request two operations at once if planned and not shy.
@@ -386,12 +386,12 @@ impl Client {
         let resp: String = {
             let mut buf = [0; 512];
             other.read(&mut buf).await?;
-            bincode::deserialize(&buf).unwrap()
+            bincode::deserialize(&buf)?
         };
         let sandwich: Option<Sandwich> = {
             let mut buf = [0; 512];
             other.read(&mut buf).await?;
-            bincode::deserialize(&buf).unwrap()
+            bincode::deserialize(&buf)?
         };
 
         println!("{}", resp);
