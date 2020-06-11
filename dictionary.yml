@@ -8,8 +8,12 @@ noha: # yes
   definition: "yes"
 no: # no
   function: Negation
-  role: Special
+  role: Adverb
   definition: "no"
+like:
+  function: Ever
+  role: Adverb
+  definition: "ever"
 meha: # me, I
   function: Pronoun
   role: Noun
@@ -26,6 +30,10 @@ nu: # to want
   role: Verb
   function: Desire
   definition: "want"
+nuha:
+  role: Verb
+  function: Have
+  definition: "have"
 ku:
   role: Noun
   function: Sandwich

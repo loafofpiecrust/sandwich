@@ -157,6 +157,7 @@ impl Client {
             background: Some(color),
         })?;
 
+        let mut persistent_ops = Vec::<Box<dyn Operation>>::new();
         self.last_result = Sandwich::default();
         loop {
             // TODO This machine might wait to receive multiple operations before applying them all at once.
@@ -165,6 +166,11 @@ impl Client {
             let mut op = self
                 .parse(&msg.text.unwrap())
                 .expect("Failed to parse phrase");
+
+            // Apply all persistent operations at every turn.
+            for passive_op in &persistent_ops {
+                self.last_result = passive_op.apply(self.last_result.clone(), &mut self.lang);
+            }
 
             // If spite is high enough, do the opposite of their order.
             if rng.gen_bool(self.lang.spite) {
@@ -175,6 +181,10 @@ impl Client {
 
             // Apply the operation to our sandwich.
             self.last_result = op.apply(self.last_result.clone(), &mut self.lang);
+
+            if op.is_persistent() {
+                persistent_ops.push(op);
+            }
 
             // TODO Say response too? Render upon saying a response?
             self.lang.render(Render {

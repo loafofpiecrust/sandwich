@@ -35,6 +35,7 @@ pub trait Operation: std::fmt::Debug {
     fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich;
     fn reverse(&self) -> Box<dyn Operation>;
     fn encode(&self, lang: &Personality) -> String;
+    fn is_persistent(&self) -> bool;
 }
 
 /// Add an ingredient to a sandwich, at the very end or relative to another ingredient.
@@ -91,6 +92,9 @@ impl Operation for Add {
         // TODO Change by word order.
         format!("{}{} {}", prep, obj.unwrap(), verb.0)
     }
+    fn is_persistent(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -133,6 +137,9 @@ impl Operation for Remove {
         let neg = lang.dictionary.word_for_def(WordFunction::Negation);
         format!("{} {}", neg.0, self.reverse().encode(lang))
     }
+    fn is_persistent(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -150,6 +157,9 @@ impl Operation for Finish {
     fn encode(&self, lang: &Personality) -> String {
         let bye = lang.dictionary.word_for_def(WordFunction::Greeting);
         bye.0.into()
+    }
+    fn is_persistent(&self) -> bool {
+        false
     }
 }
 
@@ -172,6 +182,9 @@ impl Operation for Repeat {
         let num = lang.dictionary.word_for_num(self.0);
         format!("{} {}", num.0, self.1.encode(lang))
     }
+    fn is_persistent(&self) -> bool {
+        false
+    }
 }
 
 /// Applies two operations sequentially on a sandwich.
@@ -193,6 +206,9 @@ impl Operation for Compound {
         // Conjunction goes between two sub-phrases.
         format!("{} {} {}", self.0.encode(lang), conj.0, self.1.encode(lang))
     }
+    fn is_persistent(&self) -> bool {
+        false
+    }
 }
 
 /// Applies to (roughly) the duration of an order, and means this ingredient
@@ -204,14 +220,53 @@ impl Operation for NeverAdd {
         todo!()
     }
     fn reverse(&self) -> Box<dyn Operation> {
-        todo!()
+        Box::new(Ensure(self.0.clone()))
     }
     fn encode(&self, lang: &Personality) -> String {
         // adjective: "I am allgergic to X"
         // or noun: "X is an allergy"
         // or verb: "I react to X"
         // or reverse verb: "X causes reaction"
+        // or simply: "I can't have X"
         todo!()
+    }
+    fn is_persistent(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug)]
+pub struct Ensure(pub Ingredient);
+impl Operation for Ensure {
+    fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
+        todo!()
+    }
+    fn reverse(&self) -> Box<dyn Operation> {
+        Box::new(NeverAdd(self.0.clone()))
+    }
+    fn encode(&self, lang: &Personality) -> String {
+        todo!()
+    }
+    fn is_persistent(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug)]
+pub struct Persist(pub Box<dyn Operation>);
+impl Operation for Persist {
+    fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
+        self.0.apply(sandwich, personality)
+    }
+    fn reverse(&self) -> Box<dyn Operation> {
+        Box::new(Persist(self.0.reverse()))
+    }
+    fn encode(&self, lang: &Personality) -> String {
+        let ever = lang.dictionary.word_for_def(WordFunction::Ever);
+        format!("{} {}", ever.0, self.0.encode(lang))
+    }
+    fn is_persistent(&self) -> bool {
+        true
     }
 }
 
@@ -247,6 +302,7 @@ pub struct Order {
     forgotten: Vec<Box<dyn Operation>>,
     history: Vec<Box<dyn Operation>>,
     desired: Sandwich,
+    persistent_ops: Vec<Box<dyn Operation>>,
 }
 impl Order {
     pub fn new(lang: &Personality) -> Self {
@@ -255,6 +311,7 @@ impl Order {
             history: Vec::new(),
             // TODO Pick a sandwich based on our personality.
             desired: Sandwich::random(&lang.dictionary.ingredients, 7),
+            persistent_ops: Vec::new(),
         }
     }
 

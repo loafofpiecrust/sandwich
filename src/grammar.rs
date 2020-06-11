@@ -73,9 +73,11 @@ pub enum WordFunction {
     Pronoun,
     Action,
     Desire,
+    Have,
     After,
     Before,
     And,
+    Ever,
     /// Please and thank you.
     Polite,
     // Lexical Functions
@@ -98,6 +100,7 @@ pub enum WordRole {
     /// Ingredients and pronouns
     Noun,
     Adjective,
+    Adverb,
     /// *Between* x and y
     Preposition,
     /// x *and* y
@@ -372,19 +375,19 @@ pub fn word_with_role(
 }
 
 /// Matches a negated phrase to reverse the inner meaning, either "not A" or just "A".
-// TODO Add probability to understand negation.
-fn neg_p<'a>(
+fn adv_p<'a>(
     input: &'a [AnnotatedWord],
     lang: &Personality,
 ) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
     if thread_rng().gen_bool(lang.negation) {
         alt((
             map(
-                pair(
-                    |i| word_with_def(i, WordFunction::Negation),
-                    |i| pos_p(i, lang),
-                ),
-                |(_neg, vp)| vp.reverse(),
+                pair(|i| word_with_role(i, WordRole::Adverb), |i| adv_p(i, lang)),
+                |(adv, vp)| match adv.definition() {
+                    Some(WordFunction::Ever) => Box::new(ops::Persist(vp)) as Box<dyn Operation>,
+                    Some(WordFunction::Negation) => vp.reverse(),
+                    _ => todo!(),
+                },
             ),
             |i| pos_p(i, lang),
         ))(input)
@@ -420,13 +423,13 @@ fn numbered_p<'a>(
 ) -> IResult<&'a [AnnotatedWord], Box<dyn Operation>> {
     if thread_rng().gen_bool(lang.numbers) {
         alt((
-            map(pair(number, |i| neg_p(i, lang)), |(n, vp)| {
+            map(pair(number, |i| numbered_p(i, lang)), |(n, vp)| {
                 Box::new(ops::Repeat(n, vp)) as Box<dyn Operation>
             }),
-            |i| neg_p(i, lang),
+            |i| adv_p(i, lang),
         ))(input)
     } else {
-        neg_p(input, lang)
+        adv_p(input, lang)
     }
 }
 
@@ -475,7 +478,8 @@ pub fn clause_new<'a>(
         ),
         |(np, v)| match v.definition() {
             Some(WordFunction::Desire) => Box::new(ops::Add(np, pos.clone())) as Box<dyn Operation>,
-            _ => todo!("Verb other than 'Desire' used"),
+            Some(WordFunction::Have) => Box::new(ops::Ensure(np)) as Box<dyn Operation>,
+            _ => todo!("This verb hasn't been mapped to an operation yet."),
         },
     )(input)
 }
@@ -490,7 +494,12 @@ fn conjuncted_phrase<'a>(
     if thread_rng().gen_bool(lang.conjunction) {
         alt((
             map(
-                separated_pair(inner, |i| word_with_def(i, WordFunction::And), inner),
+                separated_pair(
+                    inner,
+                    |i| word_with_def(i, WordFunction::And),
+                    // Allow recursion on conjunctions for X and (X and X), etc.
+                    |i| conjuncted_phrase(i, lang),
+                ),
                 |(a, b)| Box::new(ops::Compound(a, b)) as Box<dyn Operation>,
             ),
             inner,

@@ -1,3 +1,4 @@
+use crate::behavior::Operation;
 use crate::grammar::*;
 use itertools::Itertools;
 use rand::prelude::*;
