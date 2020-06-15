@@ -51,11 +51,12 @@ pub struct Personality {
     pub adposition: f64,
     pub conjunction: f64,
     pub numbers: f64,
+    #[serde(default)]
+    pub cloud: MeaningCloud,
     #[serde(skip, default = "Dictionary::new")]
     pub dictionary: Dictionary,
     #[serde(skip, default = "setup_display")]
     pub display: RenderSender,
-    pub cloud: MeaningCloud,
     #[serde(skip)]
     pub last_lex: Option<AnnotatedPhrase>,
 }
