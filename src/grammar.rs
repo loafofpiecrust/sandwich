@@ -1,7 +1,9 @@
 use crate::behavior::{ops, Language, Operation};
 use crate::{behavior::personality::Personality, sandwich::Ingredient};
 use itertools::Itertools;
+use lazy_static::*;
 use nom::{branch::*, bytes::complete::*, combinator::*, multi::*, sequence::*, IResult, *};
+use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use serde::Deserialize;
 use serde_yaml;
@@ -10,6 +12,17 @@ use std::{
     fmt::{self, Display, Formatter},
     fs::File,
 };
+
+lazy_static! {
+    pub static ref FULL_DICTIONARY: Dictionary = Dictionary::new();
+    pub static ref DEFAULT_WORD_MAP: Weights<DictionaryEntry> = {
+        FULL_DICTIONARY
+            .words
+            .iter()
+            .map(|(_, e)| (e.clone(), 1))
+            .collect()
+    };
+}
 
 pub struct Dictionary {
     words: HashMap<String, DictionaryEntry>,
@@ -487,6 +500,17 @@ fn greeting<'a>(input: &'a [AnnotatedWord]) -> IResult<&'a [AnnotatedWord], Pars
         },
     )(input)
 }
+fn affirmation<'a>(input: &'a [AnnotatedWord]) -> IResult<&'a [AnnotatedWord], Parsed> {
+    map(
+        |i| word_with_def(i, WordFunction::Affirmation),
+        |_| {
+            (
+                Box::new(ops::Affirm) as Box<dyn Operation>,
+                Language::default(),
+            )
+        },
+    )(input)
+}
 
 /// Top level sentence parser, either some general phrase or a special one like
 /// a greeting.
@@ -558,4 +582,161 @@ fn conjuncted_phrase<'a>(
         ),
         inner,
     ))(input)
+}
+
+/// For each word, a distribution of possible parts of speech.
+pub type Weights<T> = Vec<(T, u32)>;
+pub type POSCloud<'a> = HashMap<String, Weights<WordRole>>;
+pub type MeaningCloud = HashMap<String, Weights<DictionaryEntry>>;
+
+fn prob_word_with_def<'a>(
+    input: &'a [&'a str],
+    def: WordFunction,
+    lang: &Personality,
+) -> IResult<&'a [&'a str], AnnotatedWord> {
+    if let Some(d) = input.get(0) {
+        let possibilities = lang.get_cloud_entry(d);
+        let weights = possibilities.iter().map(|(_, p)| p);
+        let dist = WeightedIndex::new(weights).unwrap();
+        // Pick a dictionary entry for this one.
+        let choice = &possibilities[dist.sample(&mut thread_rng())];
+        if choice.0.function == def {
+            return Ok((
+                &input[1..],
+                AnnotatedWord {
+                    word: word(d.as_bytes()).unwrap().1,
+                    role: Some(choice.0.role.clone()),
+                    entry: Some(choice.0.clone()),
+                },
+            ));
+        }
+    }
+    Err(nom::Err::Error((input, nom::error::ErrorKind::IsA)))
+}
+
+fn prob_word_with_role<'a>(
+    input: &'a [&'a str],
+    def: WordRole,
+    cloud: &MeaningCloud,
+) -> IResult<&'a [&'a str], AnnotatedWord> {
+    if let Some(d) = input.get(0) {
+        let possibilities = cloud.get(*d).unwrap();
+        let weights = possibilities.iter().map(|(_, p)| p);
+        let dist = WeightedIndex::new(weights).unwrap();
+        // Pick a dictionary entry for this one.
+        let choice = &possibilities[dist.sample(&mut thread_rng())];
+        if choice.0.role == def {
+            return Ok((
+                &input[1..],
+                AnnotatedWord {
+                    word: word(d.as_bytes()).unwrap().1,
+                    role: Some(choice.0.role.clone()),
+                    entry: Some(choice.0.clone()),
+                },
+            ));
+        }
+    }
+    Err(nom::Err::Error((input, nom::error::ErrorKind::IsA)))
+}
+
+fn prob_ingredient<'a>(
+    input: &'a [&'a str],
+    lang: &Personality,
+) -> IResult<&'a [&'a str], Ingredient> {
+    map(
+        |i| prob_word_with_role(i, WordRole::Noun, &lang.cloud),
+        |w| lang.dictionary.ingredients.from_word(&w.word).clone(),
+    )(input)
+}
+fn prob_adposition<'a>(
+    input: &'a [&'a str],
+    lang: &Personality,
+) -> IResult<&'a [&'a str], ops::Relative> {
+    map(
+        pair(
+            |i| prob_ingredient(i, lang),
+            |i| prob_word_with_role(i, WordRole::Preposition, &lang.cloud),
+        ),
+        |(ingr, pos)| ops::Relative::from_def(pos.entry.as_ref().unwrap().function, ingr),
+    )(input)
+}
+fn prob_pos_p<'a>(input: &'a [&'a str], lang: &Personality) -> IResult<&'a [&'a str], Parsed> {
+    // NOTE Assumes for now that we know what adpositions are, not assigning
+    // probability to this rule itself, just the words themselves.
+    alt((
+        |i| prob_adposition(i, lang).and_then(|(i, r)| prob_clause_new(i, &r, lang)),
+        |i| prob_clause_new(i, &ops::Relative::Top, lang),
+    ))(input)
+}
+
+/// VP -> (NP) V
+pub fn prob_clause_new<'a>(
+    input: &'a [&'a str],
+    pos: &ops::Relative,
+    lang: &Personality,
+) -> IResult<&'a [&'a str], Parsed> {
+    map(
+        pair(
+            |i| prob_ingredient(i, lang),
+            |i| prob_word_with_role(i, WordRole::Verb, &lang.cloud),
+        ),
+        |(np, v)| match v.definition() {
+            Some(WordFunction::Desire) => (
+                Box::new(ops::Add(np, pos.clone())) as Box<dyn Operation>,
+                Language {
+                    adposition: if *pos == ops::Relative::Top { 0 } else { 1 },
+                    ..Default::default()
+                },
+            ),
+            Some(WordFunction::Have) => (
+                Box::new(ops::Ensure(np)) as Box<dyn Operation>,
+                Language::default(),
+            ),
+            _ => todo!("This verb hasn't been mapped to an operation yet."),
+        },
+    )(input)
+}
+
+pub struct FullParse {
+    pub operation: Box<dyn Operation>,
+    pub lang: Language,
+    pub lex: AnnotatedPhrase,
+}
+
+pub fn prob_sentence_new(input: &[u8], lang: &Personality) -> Option<FullParse> {
+    if let Ok((_, words)) = phrase(input) {
+        // Generate possible annotations until we find a successful parse.
+        for _ in 0..20 {
+            let tagged = prob_annotate(&words, lang);
+            if let Ok((_, res)) = sentence(&tagged, lang) {
+                return Some(FullParse {
+                    operation: res.0,
+                    lang: res.1,
+                    lex: tagged,
+                });
+            }
+        }
+    }
+    None
+}
+
+pub fn prob_annotate(phrase: &Phrase, context: &Personality) -> AnnotatedPhrase {
+    let mut result = AnnotatedPhrase::new();
+    for word in phrase {
+        // TODO Add a small chance for the word to be skipped if it doesn't have
+        // a high probability of something else.
+        let word_str = word.to_string();
+        let entry = context.get_cloud_entry(&word_str);
+        let weights = entry.iter().map(|(_, p)| p);
+        let dist = WeightedIndex::new(weights).unwrap();
+        let idx = dist.sample(&mut thread_rng());
+        let choice = &entry[idx];
+        result.push(AnnotatedWord {
+            word: word.clone(),
+            // TODO: Use syntactic context for word role.
+            role: Some(choice.0.role.clone()),
+            entry: Some(choice.0.clone()),
+        });
+    }
+    result
 }

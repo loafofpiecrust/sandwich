@@ -7,7 +7,8 @@ use crate::{
     comm,
     display::{setup_display, Render, RenderSender},
     grammar,
-    grammar::Parsed,
+    grammar::AnnotatedPhrase,
+    grammar::FullParse,
     grammar::WordFunction,
     sandwich::Sandwich,
     state::{Idle, OrderingSandwich, State},
@@ -26,7 +27,7 @@ use rand::prelude::*;
 use take_mut::take;
 // use futures::prelude::*;
 use futures::{pin_mut, select, FutureExt};
-use grammar::{sentence_new, Dictionary, PhraseNode};
+use grammar::{prob_sentence_new, Dictionary, PhraseNode};
 use std::{thread, time::Duration};
 
 pub struct Client {
@@ -95,12 +96,27 @@ impl Client {
             self.lang.save()?;
 
             // TODO Handle the Err case here by breaking the loop.
+            // TODO Add timeout to this instead of statically waiting at the end
+            // of every iteration. That'll make this more responsive. Then,
+            // politeness extending the timeout makes real world sense, rather
+            // than a polite machine waiting for seconds even after the request
+            // is fulfilled.
             if let Ok(msg) = msg_rx.try_next() {
                 println!("received {:?}", msg);
                 if let Some(sandwich) = msg.and_then(|m| m.sandwich) {
                     self.last_result = sandwich;
                 }
             }
+
+            // If our last operation succeeded, learn from that experience.
+            if order.last_op_successful(&mut self.lang, &self.last_result) {
+                if let Some(op) = order.last_op() {
+                    self.lang.apply_upgrade(op.skills());
+                }
+                // Tell our server that they're doing a good job!
+                self.say_and_send(&mut stream, &ops::Affirm, None).await?;
+            }
+
             // Send over the next operation!
             let op = order.pick_op(&self.lang, &self.last_result);
 
@@ -116,14 +132,14 @@ impl Client {
                     }
                 }
                 println!("op: {:?}", op);
-                let s = op.encode(&self.lang);
-                self.say_phrase(&s, None).await?;
-                let message = Message::new(Some(s.to_string()), None);
-                message.send(&mut stream).await?;
+                self.say_and_send(&mut stream, &*op, None).await?;
+                // Send this operation to our history box.
+                order.archive(op);
                 // Wait some time between each of our requests.
                 // TODO Some machines may wait for responses before sending the
                 // next operation. Or start waiting if there's a buffer of
                 // messages that haven't been acknowledged.
+                // TODO Change wait time based on shyness/politeness
                 task::sleep(Duration::from_millis(rng.gen_range(700, 1500))).await;
             } else {
                 // Break the loop if there's no more operations to make!
@@ -137,6 +153,19 @@ impl Client {
         self.say_phrase(&s, None).await?;
         let msg = Message::new(Some(s.to_string()), None);
         msg.send(&mut stream).await?;
+        Ok(())
+    }
+
+    async fn say_and_send(
+        &self,
+        stream: &mut TcpStream,
+        op: &dyn Operation,
+        sandwich: Option<Sandwich>,
+    ) -> anyhow::Result<()> {
+        let s = op.encode(&self.lang);
+        self.say_phrase(&s, None).await?;
+        let message = Message::new(Some(s.to_string()), None);
+        message.send(stream).await?;
         Ok(())
     }
 
@@ -174,8 +203,20 @@ impl Client {
 
             // TODO This machine might wait to receive multiple operations before applying them all at once.
             let msg = Message::recv(&mut stream).await?;
-            std::dbg!(&msg);
-            if let Some((mut op, lang_change)) = self.parse(&msg.text.unwrap()) {
+
+            if let Some(FullParse {
+                operation: mut op,
+                lang: lang_change,
+                lex,
+            }) = self.parse(&msg.text.unwrap())
+            {
+                // Save the lex of this phrase for one turn.
+                // If we receive a positive reply from the client machine, use
+                // this lex to update our word association weights.
+                // TODO Initial shared vocab should just be Yes + No i guess?
+                // TODO Check if `op` is an affirmation, in which case use last_lex!
+                self.lang.last_lex = Some(lex);
+
                 // Apply all persistent operations at every turn.
                 for passive_op in &persistent_ops {
                     self.last_result = passive_op.apply(self.last_result.clone(), &mut self.lang);
@@ -196,12 +237,19 @@ impl Client {
                     persistent_ops.push(op);
                 }
 
+                if let Some(op) = self.pick_server_op() {
+                    let s = op.encode(&self.lang);
+                    self.say_phrase(&s, Some(self.last_result.clone())).await?;
+                    let message = Message::new(Some(s.to_string()), None);
+                    message.send(&mut stream).await?;
+                }
+
                 // TODO Say response too? Render upon saying a response?
-                self.lang.render(Render {
-                    subtitles: None,
-                    ingredients: Some(self.last_result.ingredients.clone()),
-                    background: None,
-                })?;
+                // self.lang.render(Render {
+                //     subtitles: None,
+                //     ingredients: Some(self.last_result.ingredients.clone()),
+                //     background: None,
+                // })?;
 
                 // Only break the loop when the order is complete.
                 if self.last_result.complete {
@@ -220,75 +268,9 @@ impl Client {
         Ok(())
     }
 
-    async fn server(&mut self, mut stream: TcpStream) -> anyhow::Result<()> {
-        // Pick a random timeout for the initial handshake.
-        // TODO Influenced by shyness.
-        let waiting_time = 100;
-        println!("Waiting {}ms before ordering", waiting_time);
-        let res = timeout(
-            Duration::from_millis(waiting_time),
-            self.single_step(&mut stream, false),
-        )
-        .await;
-
-        // If we don't hear anything from the other side, initiate with our own greeting.
-        let our_order = res.is_err();
-        if our_order {
-            println!("requesting an order!");
-            self.start_order(&mut stream).await?;
-        }
-
-        while {
-            timeout(
-                Duration::from_millis(3000),
-                self.single_step(&mut stream, false),
-            )
-            .await??
-        } {}
-
-        if our_order {
-            println!("ending the order");
-            self.end_order(&mut stream).await?;
-        }
-        thread::sleep(Duration::from_millis(1000));
-
-        Ok(())
-    }
-
-    /// Returns whether to keep going (true), or if the order is over (false).
-    async fn single_step(
-        &mut self,
-        stream: &mut TcpStream,
-        skip_input: bool,
-    ) -> anyhow::Result<bool> {
-        let (request, sandwich) = if skip_input {
-            (None, None)
-        } else {
-            // Wait for a request,
-            let request: String = {
-                let mut buf = [0; 512];
-                stream.read(&mut buf).await?;
-                bincode::deserialize(&buf)?
-            };
-            let sandwich: Option<Sandwich> = {
-                let mut buf = [0; 512];
-                stream.read(&mut buf).await?;
-                bincode::deserialize(&buf)?
-            };
-            println!("Received from the other side! {}", request);
-            println!("Sandwich: {:?}", sandwich);
-            (Some(request), sandwich)
-        };
-
-        // Then respond with words and maybe a sandwich.
-        let (resp, sandwich) = self.respond(request.as_ref().map(|x| x as &str), sandwich.as_ref());
-        if let Some(resp) = resp {
-            let cont = sandwich.is_none();
-            // self.say_phrase(&resp, sandwich, stream).await?;
-            Ok(cont)
-        } else {
-            Ok(false)
-        }
+    fn pick_server_op(&self) -> Option<Box<dyn Operation>> {
+        // TODO Say NeverAdd(it) if we don't have a requested ingredient.
+        None
     }
 
     /// Say the given phrase out loud, display the given sandwich, and send both to
@@ -352,8 +334,8 @@ impl Client {
         // }
         // (response, sandwich)
     }
-    pub fn parse(&mut self, input: &str) -> Option<Parsed> {
-        sentence_new(input.as_bytes(), &self.lang)
+    pub fn parse(&mut self, input: &str) -> Option<FullParse> {
+        prob_sentence_new(input.as_bytes(), &self.lang)
     }
     pub fn lex(&self, input: &str) -> Option<Vec<grammar::AnnotatedWord>> {
         grammar::phrase(input.as_bytes())

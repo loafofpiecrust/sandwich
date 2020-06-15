@@ -20,13 +20,12 @@
 //! it in other arbitrary ways.
 
 use crate::{
-    behavior::Personality,
-    grammar::WordFunction,
+    behavior::{Language, Personality},
+    grammar::{WordFunction, DEFAULT_WORD_MAP},
     sandwich::{Ingredient, Sandwich},
 };
 use async_std::net::TcpStream;
 use async_std::prelude::*;
-use palette::{named, Srgb};
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -36,6 +35,7 @@ pub trait Operation: std::fmt::Debug {
     fn reverse(&self) -> Box<dyn Operation>;
     fn encode(&self, lang: &Personality) -> String;
     fn is_persistent(&self) -> bool;
+    fn skills(&self) -> Language;
 }
 
 /// Add an ingredient to a sandwich, at the very end or relative to another ingredient.
@@ -55,7 +55,8 @@ impl Operation for Add {
         if let Some(idx) = idx {
             ingr.insert(idx, self.0.clone());
         }
-        personality.spite += 0.05;
+        // Personality::upgrade_skill(&mut personality.spite);
+        // personality.spite += 0.05;
         Sandwich {
             ingredients: ingr,
             ..sandwich
@@ -90,6 +91,12 @@ impl Operation for Add {
     fn is_persistent(&self) -> bool {
         false
     }
+    fn skills(&self) -> Language {
+        Language {
+            adposition: if self.1 == Relative::Top { 0 } else { 1 },
+            ..Default::default()
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -118,7 +125,7 @@ impl Operation for Remove {
             ingredients.remove(idx);
         }
         // Ingredient removal raises spite!
-        personality.spite += 0.1;
+        Personality::upgrade_skill(&mut personality.spite);
         Sandwich {
             ingredients,
             ..sandwich
@@ -134,6 +141,12 @@ impl Operation for Remove {
     fn is_persistent(&self) -> bool {
         false
     }
+    fn skills(&self) -> Language {
+        Language {
+            adverbs: 1,
+            ..Default::default()
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -145,7 +158,7 @@ impl Operation for RemoveAll {
             ingredients.remove(idx);
         }
         // Ingredient removal raises spite!
-        personality.spite += 0.1;
+        Personality::upgrade_skill(&mut personality.spite);
         Sandwich {
             ingredients,
             ..sandwich
@@ -159,6 +172,12 @@ impl Operation for RemoveAll {
     }
     fn is_persistent(&self) -> bool {
         false
+    }
+    fn skills(&self) -> Language {
+        Language {
+            adverbs: 1,
+            ..Default::default()
+        }
     }
 }
 
@@ -180,6 +199,9 @@ impl Operation for Finish {
     }
     fn is_persistent(&self) -> bool {
         false
+    }
+    fn skills(&self) -> Language {
+        Default::default()
     }
 }
 
@@ -204,6 +226,13 @@ impl Operation for Repeat {
     fn is_persistent(&self) -> bool {
         false
     }
+    fn skills(&self) -> Language {
+        self.1.skills()
+            + Language {
+                numbers: 1,
+                ..Default::default()
+            }
+    }
 }
 
 /// Applies two operations sequentially on a sandwich.
@@ -227,9 +256,17 @@ impl Operation for Compound {
     fn is_persistent(&self) -> bool {
         false
     }
+    fn skills(&self) -> Language {
+        self.0.skills()
+            + self.1.skills()
+            + Language {
+                conjunction: 1,
+                ..Default::default()
+            }
+    }
 }
 
-/// A no-op that exists only as a foil to RemoveAll.
+/// A no-op that exists only as a foil to [RemoveAll].
 #[derive(Debug)]
 pub struct Ensure(pub Ingredient);
 impl Operation for Ensure {
@@ -244,6 +281,9 @@ impl Operation for Ensure {
     }
     fn is_persistent(&self) -> bool {
         false
+    }
+    fn skills(&self) -> Language {
+        todo!()
     }
 }
 
@@ -264,6 +304,76 @@ impl Operation for Persist {
     }
     fn is_persistent(&self) -> bool {
         true
+    }
+    fn skills(&self) -> Language {
+        self.0.skills()
+    }
+}
+
+/// Affirms that the last operation was applied correctly.
+#[derive(Debug)]
+pub struct Affirm;
+impl Operation for Affirm {
+    fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
+        // Update our meaning associations with the last lex that's now been
+        // affirmed correct!
+        if let Some(lex) = personality.last_lex.clone() {
+            // For each word in the lex, update its' weight in the association table.
+            for w in &lex {
+                let dict_entry = w.entry.as_ref().unwrap();
+                let s = w.word.to_string();
+                let weights = personality
+                    .cloud
+                    .entry(s)
+                    .or_insert(DEFAULT_WORD_MAP.clone());
+                // Find the weight matching the dictionary entry we used in this lex.
+                let entry = weights
+                    .iter_mut()
+                    .find(|(e, _)| e.definition == dict_entry.definition)
+                    .unwrap();
+                // Increase the score of this one!
+                // TODO Use some gradient so that an early success counts for a lot?
+                entry.1 += 1;
+            }
+        }
+
+        sandwich
+    }
+    fn reverse(&self) -> Box<dyn Operation> {
+        todo!("Add pure negation operation")
+    }
+    fn encode(&self, lang: &Personality) -> String {
+        let w = lang.dictionary.word_for_def(WordFunction::Affirmation).0;
+        format!("{}", w)
+    }
+    fn is_persistent(&self) -> bool {
+        false
+    }
+    fn skills(&self) -> Language {
+        Default::default()
+    }
+}
+
+/// Just a dummy to act as a foil for [Affirm].
+#[derive(Debug)]
+pub struct Negate;
+impl Operation for Negate {
+    fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
+        // TODO Maybe do something here?
+        sandwich
+    }
+    fn reverse(&self) -> Box<dyn Operation> {
+        Box::new(Affirm)
+    }
+    fn encode(&self, lang: &Personality) -> String {
+        let w = lang.dictionary.word_for_def(WordFunction::Negation).0;
+        format!("{}", w)
+    }
+    fn is_persistent(&self) -> bool {
+        false
+    }
+    fn skills(&self) -> Language {
+        Default::default()
     }
 }
 
@@ -299,6 +409,7 @@ pub struct Order {
     forgotten: Vec<Box<dyn Operation>>,
     history: Vec<Box<dyn Operation>>,
     desired: Sandwich,
+    last_result: Option<Sandwich>,
     persistent_ops: Vec<Box<dyn Operation>>,
 }
 impl Order {
@@ -309,7 +420,27 @@ impl Order {
             // TODO Pick a sandwich based on our personality.
             desired: Sandwich::random(&lang.dictionary.ingredients, 7),
             persistent_ops: Vec::new(),
+            last_result: None,
         }
+    }
+
+    pub fn archive(&mut self, op: Box<dyn Operation>) {
+        self.history.push(op)
+    }
+    pub fn last_op(&self) -> Option<&dyn Operation> {
+        self.history.last().map(|x| &**x)
+    }
+    pub fn last_op_successful(&self, personality: &mut Personality, result: &Sandwich) -> bool {
+        // First, apply the last operation to the last result.
+        // Then, check if that matches the current result.
+        let op = self.last_op();
+        if let Some(op) = self.last_op() {
+            if let Some(last_res) = self.last_result.clone() {
+                let imagined_result = op.apply(last_res, personality);
+                return imagined_result.ingredients == result.ingredients;
+            }
+        }
+        false
     }
 
     /// Based on the current conversation state and resulting sandwich, choose
@@ -320,6 +451,8 @@ impl Order {
         result: &Sandwich,
     ) -> Option<Box<dyn Operation>> {
         let mut rng = thread_rng();
+
+        self.last_result = Some(result.clone());
 
         // If the result has all the ingredients we want, then we're finished.
         let has_all = self

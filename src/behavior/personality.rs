@@ -1,10 +1,12 @@
 use crate::{
     display::{setup_display, Render, RenderSender},
-    grammar::Dictionary,
+    grammar::{
+        AnnotatedPhrase, Dictionary, DictionaryEntry, MeaningCloud, Weights, DEFAULT_WORD_MAP,
+    },
     sandwich::Ingredient,
 };
 use serde::{Deserialize, Serialize};
-use std::{fs::File, io::prelude::*};
+use std::fs::File;
 
 #[derive(Default)]
 pub struct Language {
@@ -53,6 +55,10 @@ pub struct Personality {
     pub dictionary: Dictionary,
     #[serde(skip, default = "setup_display")]
     pub display: RenderSender,
+    #[serde(skip)]
+    pub cloud: MeaningCloud,
+    #[serde(skip)]
+    pub last_lex: Option<AnnotatedPhrase>,
 }
 impl Personality {
     pub fn new() -> Self {
@@ -75,14 +81,25 @@ impl Personality {
                 severity: 0.8,
                 ingredient: dictionary.ingredients.random().clone(),
             }],
+            // Fill our cloud with equal weights on every definition for all words.
+            cloud: Default::default(),
             // Grammar rule weights
             adverbs: 0.1,
             adposition: 0.1,
             conjunction: 0.1,
             numbers: 0.1,
             dictionary,
+            last_lex: None,
         }
     }
+
+    pub fn get_cloud_entry(&self, key: &str) -> &Weights<DictionaryEntry> {
+        self.cloud.get(key).unwrap_or(&DEFAULT_WORD_MAP)
+    }
+
+    // /// Retrieve the meaning distribution for a particular word.
+    // /// If we find no matching entry, create one with equal weights for all definitions.
+    // pub fn cloud_entry(&self) ->
     pub fn load() -> anyhow::Result<Self> {
         let f = File::open("personality.yaml")?;
         Ok(serde_yaml::from_reader(&f)?)
