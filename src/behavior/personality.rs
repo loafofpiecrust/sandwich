@@ -55,7 +55,6 @@ pub struct Personality {
     pub dictionary: Dictionary,
     #[serde(skip, default = "setup_display")]
     pub display: RenderSender,
-    #[serde(skip)]
     pub cloud: MeaningCloud,
     #[serde(skip)]
     pub last_lex: Option<AnnotatedPhrase>,

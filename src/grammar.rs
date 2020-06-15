@@ -5,7 +5,7 @@ use lazy_static::*;
 use nom::{branch::*, bytes::complete::*, combinator::*, multi::*, sequence::*, IResult, *};
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_yaml;
 use std::{
     collections::HashMap,
@@ -76,7 +76,7 @@ impl Default for Context {
 }
 impl Context {}
 
-#[derive(PartialEq, Debug, Copy, Clone, Deserialize)]
+#[derive(PartialEq, Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum WordFunction {
     Me,
     You,
@@ -101,7 +101,7 @@ pub enum WordFunction {
 }
 
 /// Analogous to part of speech.
-#[derive(PartialEq, Debug, Copy, Clone, Deserialize)]
+#[derive(PartialEq, Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum WordRole {
     // Functional roles
     /// Things like greetings, affirmations, etc.
@@ -120,7 +120,7 @@ pub enum WordRole {
     NounConjunction,
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct DictionaryEntry {
     pub function: WordFunction,
     pub role: WordRole,
@@ -706,10 +706,10 @@ pub struct FullParse {
 pub fn prob_sentence_new(input: &[u8], lang: &Personality) -> Option<FullParse> {
     if let Ok((_, words)) = phrase(input) {
         // Generate possible annotations until we find a successful parse.
-        for _ in 0..30 {
+        for _ in 0..100 {
             let tagged = prob_annotate(&words, lang);
-            println!("potential parse: {:?}", tagged);
             if let Ok((_, res)) = sentence(&tagged, lang) {
+                println!("potential parse: {:?}", tagged);
                 return Some(FullParse {
                     operation: res.0,
                     lang: res.1,
