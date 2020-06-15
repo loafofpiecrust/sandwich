@@ -527,24 +527,24 @@ pub fn clause_new<'a>(
     pos: &ops::Relative,
     lang: &Personality,
 ) -> IResult<&'a [AnnotatedWord], Parsed> {
-    map(
+    map_opt(
         pair(
             |i| ingredient(i, lang),
             |i| word_with_role(i, WordRole::Verb),
         ),
         |(np, v)| match v.definition() {
-            Some(WordFunction::Desire) => (
+            Some(WordFunction::Desire) => Some((
                 Box::new(ops::Add(np, pos.clone())) as Box<dyn Operation>,
                 Language {
                     adposition: if *pos == ops::Relative::Top { 0 } else { 1 },
                     ..Default::default()
                 },
-            ),
-            Some(WordFunction::Have) => (
+            )),
+            Some(WordFunction::Have) => Some((
                 Box::new(ops::Ensure(np)) as Box<dyn Operation>,
                 Language::default(),
-            ),
-            _ => todo!("This verb hasn't been mapped to an operation yet."),
+            )),
+            _ => None, // _ => todo!("This verb hasn't been mapped to an operation yet."),
         },
     )(input)
 }
