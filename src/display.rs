@@ -19,7 +19,7 @@ pub fn setup_display<'a>() -> RenderSender {
     thread::spawn(move || {
         let window = std::panic::catch_unwind(|| {
             WindowSettings::new("SANDWICH", (1920, 1080))
-                .fullscreen(true)
+                // .fullscreen(true)
                 .automatic_close(true)
                 .exit_on_esc(true)
                 .vsync(true)

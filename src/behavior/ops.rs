@@ -125,7 +125,7 @@ impl Operation for Remove {
             ingredients.remove(idx);
         }
         // Ingredient removal raises spite!
-        Personality::upgrade_skill(&mut personality.spite);
+        // Personality::upgrade_skill(&mut personality.spite);
         Sandwich {
             ingredients,
             ..sandwich
@@ -158,7 +158,7 @@ impl Operation for RemoveAll {
             ingredients.remove(idx);
         }
         // Ingredient removal raises spite!
-        Personality::upgrade_skill(&mut personality.spite);
+        // Personality::upgrade_skill(&mut personality.spite);
         Sandwich {
             ingredients,
             ..sandwich
@@ -567,7 +567,8 @@ impl Order {
                 // Pick a random favorite based on their severity.
                 // NOTE Assumes every machine has at least one favorite.
                 let weights = personality.favorites.iter().map(|x| x.severity);
-                let dist = WeightedIndex::new(weights).unwrap();
+                let dist =
+                    WeightedIndex::new(weights).expect("Unable to make favorites distribution");
                 let pick = dist.sample(&mut rng);
                 return Some(Box::new(Add(
                     personality.favorites[pick].ingredient.clone(),

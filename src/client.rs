@@ -148,11 +148,7 @@ impl Client {
             }
         }
         // Say thank you and goodbye.
-        let op = ops::Finish;
-        let s = op.encode(&self.lang);
-        self.say_phrase(&s, None).await?;
-        let msg = Message::new(Some(s.to_string()), None);
-        msg.send(&mut stream).await?;
+        self.say_and_send(&mut stream, &ops::Finish, None).await?;
         Ok(())
     }
 

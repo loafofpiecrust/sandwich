@@ -706,8 +706,9 @@ pub struct FullParse {
 pub fn prob_sentence_new(input: &[u8], lang: &Personality) -> Option<FullParse> {
     if let Ok((_, words)) = phrase(input) {
         // Generate possible annotations until we find a successful parse.
-        for _ in 0..20 {
+        for _ in 0..30 {
             let tagged = prob_annotate(&words, lang);
+            println!("potential parse: {:?}", tagged);
             if let Ok((_, res)) = sentence(&tagged, lang) {
                 return Some(FullParse {
                     operation: res.0,
@@ -728,7 +729,7 @@ pub fn prob_annotate(phrase: &Phrase, context: &Personality) -> AnnotatedPhrase 
         let word_str = word.to_string();
         let entry = context.get_cloud_entry(&word_str);
         let weights = entry.iter().map(|(_, p)| p);
-        let dist = WeightedIndex::new(weights).unwrap();
+        let dist = WeightedIndex::new(weights).expect("Unable to make word distribution");
         let idx = dist.sample(&mut thread_rng());
         let choice = &entry[idx];
         result.push(AnnotatedWord {
