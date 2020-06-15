@@ -193,7 +193,8 @@ impl Client {
 
         let mut persistent_ops = Vec::<Box<dyn Operation>>::new();
         self.last_result = Sandwich::default();
-        loop {
+        // Only break the loop when the order is complete.
+        while !self.last_result.complete {
             // Save our personality frequently.
             self.lang.save()?;
 
@@ -246,11 +247,6 @@ impl Client {
                 //     ingredients: Some(self.last_result.ingredients.clone()),
                 //     background: None,
                 // })?;
-
-                // Only break the loop when the order is complete.
-                if self.last_result.complete {
-                    break;
-                }
 
                 // Send the current sandwich status back over!
                 let new_msg = Message::new(None, Some(self.last_result.clone()));

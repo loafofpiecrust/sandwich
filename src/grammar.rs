@@ -16,11 +16,14 @@ use std::{
 lazy_static! {
     pub static ref FULL_DICTIONARY: Dictionary = Dictionary::new();
     pub static ref DEFAULT_WORD_MAP: Weights<DictionaryEntry> = {
-        FULL_DICTIONARY
+        let dict = FULL_DICTIONARY
             .words
             .iter()
+            // TODO Put this into a static list to prevent code duplication.
+            .filter(|(_, x)| x.function != WordFunction::Affirmation && x.function != WordFunction::Greeting)
             .map(|(_, e)| (e.clone(), 1))
-            .collect()
+            .collect();
+        dict
     };
 }
 
@@ -518,7 +521,7 @@ fn sentence<'a>(
     input: &'a [AnnotatedWord],
     lang: &Personality,
 ) -> IResult<&'a [AnnotatedWord], Parsed> {
-    alt((|i| conjuncted_phrase(i, lang), greeting))(input)
+    alt((|i| conjuncted_phrase(i, lang), affirmation, greeting))(input)
 }
 
 /// VP -> (NP) V
@@ -727,16 +730,27 @@ pub fn prob_annotate(phrase: &Phrase, context: &Personality) -> AnnotatedPhrase 
         // TODO Add a small chance for the word to be skipped if it doesn't have
         // a high probability of something else.
         let word_str = word.to_string();
-        let entry = context.get_cloud_entry(&word_str);
-        let weights = entry.iter().map(|(_, p)| p);
-        let dist = WeightedIndex::new(weights).expect("Unable to make word distribution");
-        let idx = dist.sample(&mut thread_rng());
-        let choice = &entry[idx];
+        // Assume greeting and affirmation is shared.
+        let greeting = context.dictionary.word_for_def(WordFunction::Greeting);
+        let yes = context.dictionary.word_for_def(WordFunction::Affirmation);
+        let entry = if greeting.0 == word_str {
+            greeting.1
+        } else if yes.0 == word_str {
+            yes.1
+        } else {
+            // Any other word we have to guess at.
+            let entry = context.get_cloud_entry(&word_str);
+            let weights = entry.iter().map(|(_, p)| p);
+            let dist = WeightedIndex::new(weights).expect("Unable to make word distribution");
+            let idx = dist.sample(&mut thread_rng());
+            let choice = &entry[idx];
+            &choice.0
+        };
         result.push(AnnotatedWord {
             word: word.clone(),
             // TODO: Use syntactic context for word role.
-            role: Some(choice.0.role.clone()),
-            entry: Some(choice.0.clone()),
+            role: Some(entry.role.clone()),
+            entry: Some(entry.clone()),
         });
     }
     result
