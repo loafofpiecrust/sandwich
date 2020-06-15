@@ -327,13 +327,14 @@ impl Operation for Affirm {
                     .entry(s)
                     .or_insert(DEFAULT_WORD_MAP.clone());
                 // Find the weight matching the dictionary entry we used in this lex.
-                let entry = weights
+                if let Some(entry) = weights
                     .iter_mut()
                     .find(|(e, _)| e.definition == dict_entry.definition)
-                    .unwrap();
-                // Increase the score of this one!
-                // TODO Use some gradient so that an early success counts for a lot?
-                entry.1 += 1;
+                {
+                    // Increase the score of this one!
+                    // TODO Use some gradient so that an early success counts for a lot?
+                    entry.1 += 1;
+                }
             }
         }
 
