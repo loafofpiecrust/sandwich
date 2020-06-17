@@ -60,6 +60,8 @@ impl Ingredient {
             .unwrap()
     }
 
+    /// All bottom-level ingredients that can be added to a sandwich.
+    /// Returns pairs of (English name, native written form).
     pub fn leaves(&self) -> Vec<(String, String)> {
         if let Some(children) = self.children.as_ref() {
             children

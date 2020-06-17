@@ -43,6 +43,10 @@ pub trait Operation: std::fmt::Debug {
 pub struct Add(pub Ingredient, pub Relative);
 impl Operation for Add {
     fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
+        if !personality.has_ingredient(&self.0) {
+            return sandwich;
+        }
+
         let mut ingr = sandwich.ingredients;
         let idx = match &self.1 {
             Relative::Before(other) => ingr.iter().position(|x| x.name == other.name),
@@ -54,6 +58,7 @@ impl Operation for Add {
         };
         if let Some(idx) = idx {
             ingr.insert(idx, self.0.clone());
+            personality.use_ingredient(&self.0);
         }
         // Personality::upgrade_skill(&mut personality.spite);
         // personality.spite += 0.05;

@@ -8,7 +8,9 @@ use crate::{
 use itertools::Itertools;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::fs::File;
+use std::{collections::HashMap, fs::File};
+
+type Inventory = HashMap<String, usize>;
 
 #[derive(Default)]
 pub struct Language {
@@ -53,6 +55,8 @@ pub struct Personality {
     pub adposition: f64,
     pub conjunction: f64,
     pub numbers: f64,
+    /// Maps ingredient names to their inventory count.
+    pub inventory: Inventory,
     #[serde(default)]
     pub cloud: MeaningCloud,
     #[serde(skip, default = "Dictionary::new")]
@@ -91,9 +95,29 @@ impl Personality {
             adposition: 0.1,
             conjunction: 0.1,
             numbers: 0.1,
+            inventory: Self::default_inventory(&dictionary),
             dictionary,
             last_lex: None,
         }
+    }
+
+    fn default_inventory(dict: &Dictionary) -> Inventory {
+        const DEFAULT_INGREDIENT_COUNT: usize = 20;
+        // Grab all the bottom-level ingredients.
+        let ingredients = dict.ingredients.leaves();
+        ingredients
+            .iter()
+            // Provide a few for each one.
+            .map(|(name, _)| (name.clone(), DEFAULT_INGREDIENT_COUNT))
+            .collect()
+    }
+
+    pub fn reset_inventory(&mut self) {
+        self.inventory = Self::default_inventory(&self.dictionary);
+    }
+
+    pub fn total_inventory_count(&self) -> usize {
+        self.inventory.iter().map(|(_, count)| count).sum()
     }
 
     pub fn get_cloud_entry(&self, key: &str) -> &Weights<DictionaryEntry> {
@@ -158,6 +182,16 @@ impl Personality {
             ingredient: ingredient.clone(),
             severity: 0.1,
         });
+    }
+    pub fn has_ingredient(&self, desired: &Ingredient) -> bool {
+        *self.inventory.get(&desired.name).unwrap_or(&0) > 0
+    }
+    pub fn use_ingredient(&mut self, used: &Ingredient) {
+        let name = used.name.clone();
+        let prev = *self.inventory.get(&name).unwrap_or(&0);
+        if prev > 0 {
+            self.inventory.insert(name, prev - 1);
+        }
     }
     pub fn gen_sandwich(&self, mut len: usize) -> Sandwich {
         let mut rng = thread_rng();
