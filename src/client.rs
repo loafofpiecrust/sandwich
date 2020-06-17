@@ -334,9 +334,6 @@ impl Client {
             .ok()
             .map(|p| grammar::annotate(p.1, &self.lang))
     }
-    pub fn invent_sandwich(&self) -> Sandwich {
-        Sandwich::random(&self.lang.dictionary.ingredients, 6)
-    }
     pub fn add_behavior(&mut self, b: impl Behavior + 'static) {
         self.behaviors.push(Box::new(b));
     }

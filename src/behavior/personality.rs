@@ -3,8 +3,10 @@ use crate::{
     grammar::{
         AnnotatedPhrase, Dictionary, DictionaryEntry, MeaningCloud, Weights, DEFAULT_WORD_MAP,
     },
-    sandwich::Ingredient,
+    sandwich::{Ingredient, Sandwich, BG_COLORS},
 };
+use itertools::Itertools;
+use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 
@@ -44,8 +46,8 @@ pub struct Personality {
     pub planned: f64,
     pub spontaneity: f64,
     pub order_sensitivity: f64,
-    pub allergies: Vec<Allergy>,
-    pub favorites: Vec<Allergy>,
+    pub allergies: Vec<Preference>,
+    pub preferences: Vec<Preference>,
     // Weights for grammar rules!
     pub adverbs: f64,
     pub adposition: f64,
@@ -73,11 +75,12 @@ impl Personality {
             spite: 0.0,
             order_sensitivity: 1.0,
             spontaneity: 0.1,
-            allergies: vec![Allergy {
+            allergies: vec![Preference {
                 severity: 0.6,
                 ingredient: dictionary.ingredients.random().clone(),
             }],
-            favorites: vec![Allergy {
+            // TODO Add preferences for other ingredients starting at zero??
+            preferences: vec![Preference {
                 severity: 0.8,
                 ingredient: dictionary.ingredients.random().clone(),
             }],
@@ -141,10 +144,54 @@ impl Personality {
     pub fn render(&self, state: Render) -> anyhow::Result<()> {
         Ok(self.display.send(state)?)
     }
+    pub fn increase_preference(&mut self, ingredient: &Ingredient) {
+        // If we already have some preference for this ingredient, increase its severity.
+        if let Some(pref) = self
+            .preferences
+            .iter_mut()
+            .find(|x| &x.ingredient == ingredient)
+        {
+            pref.severity += 0.1;
+        }
+        // Otherwise, add a new preference with the base severity.
+        self.preferences.push(Preference {
+            ingredient: ingredient.clone(),
+            severity: 0.1,
+        });
+    }
+    pub fn gen_sandwich(&self, mut len: usize) -> Sandwich {
+        let mut rng = thread_rng();
+        let mut ingredients = Vec::new();
+        // Pick a base first, then the inside ingredients.
+        let (bottom, top) = self.dictionary.ingredients.random_base();
+        ingredients.push(bottom.clone());
+        // Choose ingredients based on our current preferences.
+        // Preferences and allergies could override each other applying to the
+        // same ingredient.
+        for fav in &self.preferences {
+            if rng.gen_bool(fav.severity) {
+                ingredients.push(fav.ingredient.clone());
+                len -= 1;
+            }
+        }
+        ingredients.extend(
+            (0..)
+                .map(|_| self.dictionary.ingredients.random().clone())
+                // 50% chance for a duplicate ingredient to stay.
+                .unique_by(|x| format!("{}{}", x.name, rng.gen_bool(0.5)))
+                .take(len),
+        );
+        ingredients.push(top.clone());
+        Sandwich {
+            ingredients,
+            complete: true,
+            background_color: BG_COLORS.choose(&mut rng).unwrap().to_string(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct Allergy {
+pub struct Preference {
     pub ingredient: Ingredient,
     pub severity: f64,
 }

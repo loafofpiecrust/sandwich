@@ -319,6 +319,7 @@ impl Operation for Affirm {
         // affirmed correct!
         if let Some(lex) = personality.last_lex.clone() {
             // For each word in the lex, update its' weight in the association table.
+            println!("last lex: {:?}", lex);
             for w in &lex {
                 let dict_entry = w.entry.as_ref().unwrap();
                 let s = w.word.to_string();
@@ -419,7 +420,7 @@ impl Order {
             forgotten: Vec::new(),
             history: Vec::new(),
             // TODO Pick a sandwich based on our personality.
-            desired: Sandwich::random(&lang.dictionary.ingredients, 7),
+            desired: lang.gen_sandwich(7),
             persistent_ops: Vec::new(),
             last_result: None,
         }
@@ -560,19 +561,19 @@ impl Order {
             let any_favs = self.desired.ingredients.iter().any(|x| {
                 // Check if one of our favorites includes this ingredient.
                 personality
-                    .favorites
+                    .preferences
                     .iter()
                     .any(|fav| fav.ingredient.includes(x) && rng.gen_bool(fav.severity))
             });
-            if !any_favs && !personality.favorites.is_empty() {
+            if !any_favs && !personality.preferences.is_empty() {
                 // Pick a random favorite based on their severity.
                 // NOTE Assumes every machine has at least one favorite.
-                let weights = personality.favorites.iter().map(|x| x.severity);
+                let weights = personality.preferences.iter().map(|x| x.severity);
                 let dist =
                     WeightedIndex::new(weights).expect("Unable to make favorites distribution");
                 let pick = dist.sample(&mut rng);
                 return Some(Box::new(Add(
-                    personality.favorites[pick].ingredient.clone(),
+                    personality.preferences[pick].ingredient.clone(),
                     Relative::Top,
                 )));
             }
