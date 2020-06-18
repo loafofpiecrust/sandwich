@@ -92,13 +92,6 @@ impl Client {
         let (msg_sx, mut msg_rx) = channel(1);
         let recv_task = task::spawn(Self::receives_msgs(stream.clone(), msg_sx));
         loop {
-            // Refill the ingredient inventory when we get really low on
-            // *everything*. So we could run out of several things before
-            // hitting the reset.
-            if self.lang.total_inventory_count() < 10 {
-                self.lang.reset_inventory();
-            }
-
             // Save our personality frequently.
             self.lang.save()?;
 
@@ -202,6 +195,13 @@ impl Client {
         self.last_result = Sandwich::default();
         // Only break the loop when the order is complete.
         while !self.last_result.complete {
+            // Refill the ingredient inventory when we get really low on
+            // *everything*. So we could run out of several things before
+            // hitting the reset.
+            if self.lang.total_inventory_count() < 10 {
+                self.lang.reset_inventory();
+            }
+
             // Save our personality frequently.
             self.lang.save()?;
 
