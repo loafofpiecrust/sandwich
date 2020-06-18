@@ -252,11 +252,11 @@ impl Client {
                 }
 
                 // TODO Say response too? Render upon saying a response?
-                // self.lang.render(Render {
-                //     subtitles: None,
-                //     ingredients: Some(self.last_result.ingredients.clone()),
-                //     background: None,
-                // })?;
+                self.lang.render(Render {
+                    subtitles: None,
+                    ingredients: Some(self.last_result.ingredients.clone()),
+                    background: None,
+                })?;
 
                 // Send the current sandwich status back over!
                 let new_msg = Message::new(None, Some(self.last_result.clone()));
