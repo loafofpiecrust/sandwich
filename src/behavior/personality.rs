@@ -212,7 +212,7 @@ impl Personality {
             (0..)
                 .map(|_| self.dictionary.ingredients.random().clone())
                 // 50% chance for a duplicate ingredient to stay.
-                .unique_by(|x| format!("{}{}", x.name, rng.gen_bool(0.5)))
+                .unique_by(|x| format!("{}{}", x.name, rng.gen_bool(0.3)))
                 .take(len),
         );
         ingredients.push(top.clone());

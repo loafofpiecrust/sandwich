@@ -224,13 +224,6 @@ impl Client {
                 lex,
             }) = self.parse(&msg.text.unwrap())
             {
-                // Save the lex of this phrase for one turn.
-                // If we receive a positive reply from the client machine, use
-                // this lex to update our word association weights.
-                // TODO Initial shared vocab should just be Yes + No i guess?
-                // TODO Check if `op` is an affirmation, in which case use last_lex!
-                self.lang.last_lex = Some(lex);
-
                 // Apply all persistent operations at every turn.
                 for passive_op in &persistent_ops {
                     self.last_result = passive_op.apply(self.last_result.clone(), &mut self.lang);
@@ -265,6 +258,13 @@ impl Client {
                 if op.is_persistent() {
                     persistent_ops.push(op);
                 }
+
+                // Save the lex of this phrase for one turn.
+                // If we receive a positive reply from the client machine, use
+                // this lex to update our word association weights.
+                // TODO Initial shared vocab should just be Yes + No i guess?
+                // TODO Check if `op` is an affirmation, in which case use last_lex!
+                self.lang.last_lex = Some(lex);
             } else {
                 println!("Failed to parse phrase")
             }

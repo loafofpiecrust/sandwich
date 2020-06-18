@@ -712,7 +712,6 @@ pub fn prob_sentence_new(input: &[u8], lang: &Personality) -> Option<FullParse> 
         for _ in 0..100 {
             let tagged = prob_annotate(&words, lang);
             if let Ok((_, res)) = sentence(&tagged, lang) {
-                println!("potential parse: {:?}", tagged);
                 return Some(FullParse {
                     operation: res.0,
                     lang: res.1,
