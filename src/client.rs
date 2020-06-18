@@ -101,10 +101,16 @@ impl Client {
             // politeness extending the timeout makes real world sense, rather
             // than a polite machine waiting for seconds even after the request
             // is fulfilled.
-            if let Ok(msg) = msg_rx.try_next() {
+            if let Ok(Some(msg)) = msg_rx.try_next() {
                 println!("received {:?}", msg);
-                if let Some(sandwich) = msg.and_then(|m| m.sandwich) {
+                if let Some(sandwich) = msg.sandwich {
                     self.last_result = sandwich;
+                }
+
+                // If the server sent back any changes to our order, like them
+                // being out of an ingredient, apply that to our desired sandwich.
+                if let Some(FullParse { operation, .. }) = msg.text.and_then(|t| self.parse(&t)) {
+                    order.desired = operation.apply(order.desired.clone(), &mut self.lang);
                 }
             }
 
@@ -184,6 +190,13 @@ impl Client {
     ) -> anyhow::Result<()> {
         let mut rng = thread_rng();
 
+        // Refill the ingredient inventory when we get really low on
+        // *everything*. So we could run out of several things before
+        // hitting the reset.
+        if self.lang.total_inventory_count() < 10 {
+            self.lang.reset_inventory();
+        }
+
         // Set the shared background color.
         self.lang.render(Render {
             ingredients: None,
@@ -195,13 +208,6 @@ impl Client {
         self.last_result = Sandwich::default();
         // Only break the loop when the order is complete.
         while !self.last_result.complete {
-            // Refill the ingredient inventory when we get really low on
-            // *everything*. So we could run out of several things before
-            // hitting the reset.
-            if self.lang.total_inventory_count() < 10 {
-                self.lang.reset_inventory();
-            }
-
             // Save our personality frequently.
             self.lang.save()?;
 
@@ -237,15 +243,12 @@ impl Client {
                 self.last_result = op.apply(self.last_result.clone(), &mut self.lang);
                 self.lang.apply_upgrade(lang_change);
 
-                if op.is_persistent() {
-                    persistent_ops.push(op);
+                if let Some(op) = self.pick_server_op(&*op) {
+                    self.say_and_send(&mut stream, &*op, None).await?;
                 }
 
-                if let Some(op) = self.pick_server_op() {
-                    let s = op.encode(&self.lang);
-                    self.say_phrase(&s, Some(self.last_result.clone())).await?;
-                    let message = Message::new(Some(s.to_string()), None);
-                    message.send(&mut stream).await?;
+                if op.is_persistent() {
+                    persistent_ops.push(op);
                 }
 
                 // TODO Say response too? Render upon saying a response?
@@ -267,8 +270,13 @@ impl Client {
         Ok(())
     }
 
-    fn pick_server_op(&self) -> Option<Box<dyn Operation>> {
-        // TODO Say NeverAdd(it) if we don't have a requested ingredient.
+    fn pick_server_op(&self, last_request: &dyn Operation) -> Option<Box<dyn Operation>> {
+        // Never add the requested ingredient if we don't have any more.
+        if let Some(requested_ingredient) = last_request.main_ingredient() {
+            if !self.lang.has_ingredient(&requested_ingredient) {
+                return Some(Box::new(ops::Remove(requested_ingredient.clone())));
+            }
+        }
         None
     }
 

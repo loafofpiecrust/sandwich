@@ -36,6 +36,7 @@ pub trait Operation: std::fmt::Debug {
     fn encode(&self, lang: &Personality) -> String;
     fn is_persistent(&self) -> bool;
     fn skills(&self) -> Language;
+    fn main_ingredient(&self) -> Option<&Ingredient>;
 }
 
 /// Add an ingredient to a sandwich, at the very end or relative to another ingredient.
@@ -102,6 +103,9 @@ impl Operation for Add {
             ..Default::default()
         }
     }
+    fn main_ingredient(&self) -> Option<&Ingredient> {
+        Some(&self.0)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -122,7 +126,7 @@ impl Relative {
 
 /// Remove the given ingredient from a sandwich.
 #[derive(Debug)]
-pub struct Remove(Ingredient);
+pub struct Remove(pub Ingredient);
 impl Operation for Remove {
     fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
         let mut ingredients = sandwich.ingredients;
@@ -152,10 +156,13 @@ impl Operation for Remove {
             ..Default::default()
         }
     }
+    fn main_ingredient(&self) -> Option<&Ingredient> {
+        Some(&self.0)
+    }
 }
 
 #[derive(Debug)]
-pub struct RemoveAll(Ingredient);
+pub struct RemoveAll(pub Ingredient);
 impl Operation for RemoveAll {
     fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
         let mut ingredients = sandwich.ingredients;
@@ -184,6 +191,9 @@ impl Operation for RemoveAll {
             ..Default::default()
         }
     }
+    fn main_ingredient(&self) -> Option<&Ingredient> {
+        Some(&self.0)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -207,6 +217,9 @@ impl Operation for Finish {
     }
     fn skills(&self) -> Language {
         Default::default()
+    }
+    fn main_ingredient(&self) -> Option<&Ingredient> {
+        None
     }
 }
 
@@ -237,6 +250,9 @@ impl Operation for Repeat {
                 numbers: 1,
                 ..Default::default()
             }
+    }
+    fn main_ingredient(&self) -> Option<&Ingredient> {
+        self.1.main_ingredient()
     }
 }
 
@@ -269,6 +285,11 @@ impl Operation for Compound {
                 ..Default::default()
             }
     }
+    fn main_ingredient(&self) -> Option<&Ingredient> {
+        self.0
+            .main_ingredient()
+            .or_else(|| self.1.main_ingredient())
+    }
 }
 
 /// A no-op that exists only as a foil to [RemoveAll].
@@ -289,6 +310,9 @@ impl Operation for Ensure {
     }
     fn skills(&self) -> Language {
         todo!()
+    }
+    fn main_ingredient(&self) -> Option<&Ingredient> {
+        Some(&self.0)
     }
 }
 
@@ -312,6 +336,9 @@ impl Operation for Persist {
     }
     fn skills(&self) -> Language {
         self.0.skills()
+    }
+    fn main_ingredient(&self) -> Option<&Ingredient> {
+        self.0.main_ingredient()
     }
 }
 
@@ -359,6 +386,9 @@ impl Operation for Affirm {
     fn skills(&self) -> Language {
         Default::default()
     }
+    fn main_ingredient(&self) -> Option<&Ingredient> {
+        None
+    }
 }
 
 /// Just a dummy to act as a foil for [Affirm].
@@ -381,6 +411,9 @@ impl Operation for Negate {
     }
     fn skills(&self) -> Language {
         Default::default()
+    }
+    fn main_ingredient(&self) -> Option<&Ingredient> {
+        None
     }
 }
 
@@ -413,9 +446,9 @@ impl Operation for Negate {
 // }
 
 pub struct Order {
+    pub desired: Sandwich,
     forgotten: Vec<Box<dyn Operation>>,
     history: Vec<Box<dyn Operation>>,
-    desired: Sandwich,
     last_result: Option<Sandwich>,
     persistent_ops: Vec<Box<dyn Operation>>,
 }
