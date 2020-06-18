@@ -1,5 +1,6 @@
 use crate::sandwich::Ingredient;
 use piston_window::*;
+use rand::prelude::*;
 use std::collections::HashMap;
 use std::sync::mpsc::{sync_channel, SyncSender};
 use std::thread;
@@ -33,9 +34,11 @@ pub fn setup_display<'a>() -> RenderSender {
             };
             let scale = 12.0;
             let offset = 1.0;
+            let mut rng = thread_rng();
             let mut font = window.load_font("assets/OpenSans-Regular.ttf").unwrap();
             let mut texture_map = HashMap::new();
             let mut textures = Vec::new();
+            let mut rotations = Vec::<f64>::new();
             let mut subtitles = String::new();
             let mut background = [0.0, 0.0, 0.0, 1.0];
             while let Some(e) = window.next() {
@@ -43,6 +46,14 @@ pub fn setup_display<'a>() -> RenderSender {
                 if let Ok(render) = receiver.try_recv() {
                     // Convert ingredient name to texture of "images/ingredient-name.png"
                     if let Some(ingr) = render.ingredients {
+                        if rotations.len() < ingr.len() {
+                            rotations.truncate(ingr.len());
+                        } else {
+                            for _ in 0..(ingr.len() - rotations.len()) {
+                                rotations.push(rng.gen_range(0.0, 365.0));
+                            }
+                        }
+
                         textures = ingr
                             .into_iter()
                             .map(|x| {
@@ -81,7 +92,9 @@ pub fn setup_display<'a>() -> RenderSender {
 
                     // Render all the ingredients as stacked images.
                     let mut curr = c.transform.trans(400.0, 200.0).scale(scale, scale);
-                    for t in &textures {
+                    for (idx, t) in textures.iter().enumerate() {
+                        let rot = rotations[idx];
+                        curr = curr.rot_deg(rot);
                         image(t, curr, g);
                         curr = curr.trans(0.0, -offset);
                     }
