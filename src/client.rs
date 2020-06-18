@@ -109,8 +109,12 @@ impl Client {
 
                 // If the server sent back any changes to our order, like them
                 // being out of an ingredient, apply that to our desired sandwich.
-                if let Some(FullParse { operation, .. }) = msg.text.and_then(|t| self.parse(&t)) {
+                if let Some(FullParse { operation, lex, .. }) =
+                    msg.text.and_then(|t| self.parse(&t))
+                {
+                    println!("Received response op: {:?}", operation);
                     order.desired = operation.apply(order.desired.clone(), &mut self.lang);
+                    self.lang.last_lex = Some(lex);
                 }
             }
 
