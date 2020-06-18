@@ -165,8 +165,8 @@ impl Client {
         sandwich: Option<Sandwich>,
     ) -> anyhow::Result<()> {
         let s = op.encode(&self.lang);
-        self.say_phrase(&s, None).await?;
-        let message = Message::new(Some(s.to_string()), None);
+        self.say_phrase(&s, sandwich.clone()).await?;
+        let message = Message::new(Some(s.to_string()), sandwich);
         message.send(stream).await?;
         Ok(())
     }
@@ -244,23 +244,23 @@ impl Client {
                 self.lang.apply_upgrade(lang_change);
 
                 if let Some(op) = self.pick_server_op(&*op) {
-                    self.say_and_send(&mut stream, &*op, None).await?;
+                    self.say_and_send(&mut stream, &*op, Some(self.last_result.clone()))
+                        .await?;
+                } else {
+                    self.lang.render(Render {
+                        subtitles: Some(String::new()),
+                        ingredients: Some(self.last_result.ingredients.clone()),
+                        background: None,
+                    })?;
+
+                    // Send the current sandwich status back over!
+                    let new_msg = Message::new(None, Some(self.last_result.clone()));
+                    new_msg.send(&mut stream).await?;
                 }
 
                 if op.is_persistent() {
                     persistent_ops.push(op);
                 }
-
-                // TODO Say response too? Render upon saying a response?
-                self.lang.render(Render {
-                    subtitles: None,
-                    ingredients: Some(self.last_result.ingredients.clone()),
-                    background: None,
-                })?;
-
-                // Send the current sandwich status back over!
-                let new_msg = Message::new(None, Some(self.last_result.clone()));
-                new_msg.send(&mut stream).await?;
             } else {
                 println!("Failed to parse phrase")
             }
