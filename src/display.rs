@@ -49,7 +49,7 @@ pub fn setup_display<'a>() -> RenderSender {
                         if rotations.len() < ingr.len() {
                             rotations.truncate(ingr.len());
                         } else {
-                            for _ in 0..(ingr.len() - rotations.len()) {
+                            while rotations.len() < ingr.len() {
                                 rotations.push(rng.gen_range(0.0, 365.0));
                             }
                         }
@@ -94,8 +94,7 @@ pub fn setup_display<'a>() -> RenderSender {
                     let mut curr = c.transform.trans(400.0, 200.0).scale(scale, scale);
                     for (idx, t) in textures.iter().enumerate() {
                         let rot = rotations[idx];
-                        curr = curr.rot_deg(rot);
-                        image(t, curr, g);
+                        image(t, curr.rot_deg(rot), g);
                         curr = curr.trans(0.0, -offset);
                     }
                 });
