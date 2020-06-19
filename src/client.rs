@@ -240,7 +240,7 @@ impl Client {
                 self.last_result = op.apply(self.last_result.clone(), &mut self.lang);
                 self.lang.apply_upgrade(lang_change);
 
-                if let Some(op) = self.pick_server_op(&*op) {
+                if let Some(op) = op.respond(&self.lang) {
                     self.say_and_send(&mut stream, &*op, Some(self.last_result.clone()))
                         .await?;
                 } else {
@@ -272,16 +272,6 @@ impl Client {
 
         println!("The order is finished!");
         Ok(())
-    }
-
-    fn pick_server_op(&self, last_request: &dyn Operation) -> Option<Box<dyn Operation>> {
-        // Never add the requested ingredient if we don't have any more.
-        if let Some(requested_ingredient) = last_request.main_ingredient() {
-            if !self.lang.has_ingredient(&requested_ingredient) {
-                return Some(Box::new(ops::Remove(requested_ingredient.clone())));
-            }
-        }
-        None
     }
 
     /// Say the given phrase out loud, display the given sandwich, and send both to

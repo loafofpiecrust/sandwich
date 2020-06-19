@@ -32,11 +32,11 @@ use serde::{Deserialize, Serialize};
 
 pub trait Operation: std::fmt::Debug {
     fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich;
+    fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>>;
     fn reverse(&self) -> Box<dyn Operation>;
     fn encode(&self, lang: &Personality) -> String;
     fn is_persistent(&self) -> bool;
     fn skills(&self) -> Language;
-    fn main_ingredient(&self) -> Option<&Ingredient>;
 }
 
 /// Add an ingredient to a sandwich, at the very end or relative to another ingredient.
@@ -103,8 +103,13 @@ impl Operation for Add {
             ..Default::default()
         }
     }
-    fn main_ingredient(&self) -> Option<&Ingredient> {
-        Some(&self.0)
+    fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
+        // Never add the requested ingredient if we don't have any more.
+        if !personality.has_ingredient(&self.0) {
+            Some(Box::new(RemoveAll(self.0.clone())))
+        } else {
+            None
+        }
     }
 }
 
@@ -156,8 +161,8 @@ impl Operation for Remove {
             ..Default::default()
         }
     }
-    fn main_ingredient(&self) -> Option<&Ingredient> {
-        Some(&self.0)
+    fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
+        None
     }
 }
 
@@ -191,8 +196,8 @@ impl Operation for RemoveAll {
             ..Default::default()
         }
     }
-    fn main_ingredient(&self) -> Option<&Ingredient> {
-        Some(&self.0)
+    fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
+        None
     }
 }
 
@@ -218,7 +223,7 @@ impl Operation for Finish {
     fn skills(&self) -> Language {
         Default::default()
     }
-    fn main_ingredient(&self) -> Option<&Ingredient> {
+    fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
         None
     }
 }
@@ -251,8 +256,8 @@ impl Operation for Repeat {
                 ..Default::default()
             }
     }
-    fn main_ingredient(&self) -> Option<&Ingredient> {
-        self.1.main_ingredient()
+    fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
+        None
     }
 }
 
@@ -285,10 +290,8 @@ impl Operation for Compound {
                 ..Default::default()
             }
     }
-    fn main_ingredient(&self) -> Option<&Ingredient> {
-        self.0
-            .main_ingredient()
-            .or_else(|| self.1.main_ingredient())
+    fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
+        None
     }
 }
 
@@ -311,8 +314,8 @@ impl Operation for Ensure {
     fn skills(&self) -> Language {
         todo!()
     }
-    fn main_ingredient(&self) -> Option<&Ingredient> {
-        Some(&self.0)
+    fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
+        None
     }
 }
 
@@ -337,8 +340,8 @@ impl Operation for Persist {
     fn skills(&self) -> Language {
         self.0.skills()
     }
-    fn main_ingredient(&self) -> Option<&Ingredient> {
-        self.0.main_ingredient()
+    fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
+        None
     }
 }
 
@@ -386,7 +389,7 @@ impl Operation for Affirm {
     fn skills(&self) -> Language {
         Default::default()
     }
-    fn main_ingredient(&self) -> Option<&Ingredient> {
+    fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
         None
     }
 }
@@ -412,8 +415,36 @@ impl Operation for Negate {
     fn skills(&self) -> Language {
         Default::default()
     }
-    fn main_ingredient(&self) -> Option<&Ingredient> {
+    fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
         None
+    }
+}
+
+#[derive(Debug)]
+struct CheckFor(pub Ingredient);
+impl Operation for CheckFor {
+    fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
+        sandwich
+    }
+    fn reverse(&self) -> Box<dyn Operation> {
+        todo!()
+    }
+    fn encode(&self, lang: &Personality) -> String {
+        todo!()
+    }
+    fn is_persistent(&self) -> bool {
+        false
+    }
+    fn skills(&self) -> Language {
+        Default::default()
+    }
+    fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
+        // If we have the asked for ingredient, respond positively.
+        if !personality.has_ingredient(&self.0) {
+            Some(Box::new(RemoveAll(self.0.clone())))
+        } else {
+            Some(Box::new(Ensure(self.0.clone())))
+        }
     }
 }
 
@@ -617,10 +648,14 @@ impl Order {
             }
         }
 
-        // If there are multiple of the ingredient we want, ask for them all at once.
-
         let next_ingr = self.desired.ingredients.get(next_idx);
         next_ingr.map(|next_ingr| {
+            // Maybe ask if they have the ingredient we want.
+            if rng.gen_bool(personality.shyness) {
+                return Box::new(CheckFor(next_ingr.clone())) as Box<dyn Operation>;
+            }
+
+            // If there are multiple of the ingredient we want, ask for them all at once.
             // Number of the ingredient we want in a row
             // TODO Check the whole list of remaining ingredients if order doesn't
             // matter to this machine.
