@@ -86,6 +86,7 @@ pub enum WordFunction {
     Greeting,
     Affirmation,
     Negation,
+    Question,
     Pronoun,
     Action,
     Desire,
@@ -407,6 +408,7 @@ fn adv_p<'a>(
                             Box::new(ops::Persist(vp)) as Box<dyn Operation>
                         }
                         Some(WordFunction::Negation) => vp.reverse(),
+                        Some(WordFunction::Question) => vp.question(),
                         _ => todo!(),
                     }
                 } else {

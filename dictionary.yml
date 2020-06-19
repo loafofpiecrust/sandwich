@@ -10,6 +10,10 @@ no: # no
   function: Negation
   role: Adverb
   definition: "no"
+he:
+  function: Question
+  role: Adverb
+  definition: "can?"
 like:
   function: Ever
   role: Adverb

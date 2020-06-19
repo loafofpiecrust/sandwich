@@ -34,6 +34,7 @@ pub trait Operation: std::fmt::Debug {
     fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich;
     fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>>;
     fn reverse(&self) -> Box<dyn Operation>;
+    fn question(&self) -> Box<dyn Operation>;
     fn encode(&self, lang: &Personality) -> String;
     fn is_persistent(&self) -> bool;
     fn skills(&self) -> Language;
@@ -111,6 +112,9 @@ impl Operation for Add {
             None
         }
     }
+    fn question(&self) -> Box<dyn Operation> {
+        Box::new(CheckFor(self.0.clone()))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -164,6 +168,9 @@ impl Operation for Remove {
     fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
         None
     }
+    fn question(&self) -> Box<dyn Operation> {
+        todo!()
+    }
 }
 
 #[derive(Debug)]
@@ -197,6 +204,9 @@ impl Operation for RemoveAll {
     fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
         None
     }
+    fn question(&self) -> Box<dyn Operation> {
+        todo!()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -223,6 +233,9 @@ impl Operation for Finish {
     }
     fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
         None
+    }
+    fn question(&self) -> Box<dyn Operation> {
+        todo!()
     }
 }
 
@@ -256,6 +269,9 @@ impl Operation for Repeat {
     }
     fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
         None
+    }
+    fn question(&self) -> Box<dyn Operation> {
+        todo!()
     }
 }
 
@@ -291,6 +307,9 @@ impl Operation for Compound {
     fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
         None
     }
+    fn question(&self) -> Box<dyn Operation> {
+        todo!()
+    }
 }
 
 /// A no-op that exists only as a foil to [RemoveAll].
@@ -314,6 +333,9 @@ impl Operation for Ensure {
     }
     fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
         None
+    }
+    fn question(&self) -> Box<dyn Operation> {
+        todo!()
     }
 }
 
@@ -340,6 +362,9 @@ impl Operation for Persist {
     }
     fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
         None
+    }
+    fn question(&self) -> Box<dyn Operation> {
+        todo!()
     }
 }
 
@@ -390,6 +415,9 @@ impl Operation for Affirm {
     fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
         None
     }
+    fn question(&self) -> Box<dyn Operation> {
+        todo!()
+    }
 }
 
 /// Just a dummy to act as a foil for [Affirm].
@@ -416,8 +444,13 @@ impl Operation for Negate {
     fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
         None
     }
+    fn question(&self) -> Box<dyn Operation> {
+        todo!()
+    }
 }
 
+/// TODO Consider turning this into a generic question wrapper. Adds the
+/// modifier, makes no application, but must send a response. Think on it.
 #[derive(Debug)]
 struct CheckFor(pub Ingredient);
 impl Operation for CheckFor {
@@ -428,7 +461,10 @@ impl Operation for CheckFor {
         todo!()
     }
     fn encode(&self, lang: &Personality) -> String {
-        todo!()
+        let q = lang.dictionary.word_for_def(WordFunction::Question).0;
+        let verb = lang.dictionary.word_for_def(WordFunction::Have).0;
+        let n = lang.dictionary.ingredients.to_word(&self.0, String::new());
+        format!("{} {} {}", q, n.unwrap(), verb)
     }
     fn is_persistent(&self) -> bool {
         false
@@ -443,6 +479,10 @@ impl Operation for CheckFor {
         } else {
             Some(Box::new(Ensure(self.0.clone())))
         }
+    }
+    fn question(&self) -> Box<dyn Operation> {
+        // A questioned question becomes a statement.
+        Box::new(Add(self.0.clone(), Relative::Top))
     }
 }
 
