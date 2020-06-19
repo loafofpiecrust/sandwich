@@ -1,8 +1,10 @@
+use crate::behavior::Personality;
 use crate::sandwich::Ingredient;
+use async_std::task;
 use piston_window::*;
 use rand::prelude::*;
 use std::collections::HashMap;
-use std::sync::mpsc::{sync_channel, SyncSender};
+use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::thread;
 
 #[derive(Debug, Default)]
@@ -12,12 +14,19 @@ pub struct Render {
     pub background: Option<&'static str>,
 }
 
+pub struct Display {
+    pub render: RenderSender,
+    pub actions: Receiver<PersonalityAction>,
+}
+
+pub type PersonalityAction = fn(&mut Personality) -> ();
 pub type RenderSender = SyncSender<Render>;
 
 // TODO Render both ingredients and subtitles.
-pub fn setup_display<'a>() -> RenderSender {
+pub fn setup_display<'a>() -> Display {
     let (sender, receiver) = sync_channel::<Render>(1);
-    thread::spawn(move || {
+    let (action_sx, action_rx) = sync_channel::<PersonalityAction>(1);
+    task::spawn(async move {
         let window = std::panic::catch_unwind(|| {
             WindowSettings::new("SANDWICH", (1920, 1080))
                 // .fullscreen(true)
@@ -28,6 +37,7 @@ pub fn setup_display<'a>() -> RenderSender {
                 .unwrap()
         });
         if let Ok(mut window) = window {
+            let mut events = Events::new(EventSettings::new());
             let mut tc = TextureContext {
                 factory: window.factory.clone(),
                 encoder: window.factory.create_command_buffer().into(),
@@ -41,12 +51,12 @@ pub fn setup_display<'a>() -> RenderSender {
             let mut rotations = Vec::<f64>::new();
             let mut subtitles = String::new();
             let mut background = [0.0, 0.0, 0.0, 1.0];
-            while let Some(e) = window.next() {
+            while let Some(e) = events.next(&mut window) {
                 // Try to receive render updates if there are any.
                 if let Ok(render) = receiver.try_recv() {
                     // Convert ingredient name to texture of "images/ingredient-name.png"
                     if let Some(ingr) = render.ingredients {
-                        if rotations.len() < ingr.len() {
+                        if rotations.len() > ingr.len() {
                             rotations.truncate(ingr.len());
                         } else {
                             while rotations.len() < ingr.len() {
@@ -93,11 +103,28 @@ pub fn setup_display<'a>() -> RenderSender {
                     // Render all the ingredients as stacked images.
                     let mut curr = c.transform.trans(400.0, 200.0).scale(scale, scale);
                     for (idx, t) in textures.iter().enumerate() {
-                        let rot = rotations[idx];
+                        let rot = if idx == 0 || idx == textures.len() - 1 {
+                            0.0
+                        } else {
+                            rotations[idx]
+                        };
                         image(t, curr.rot_deg(rot), g);
                         curr = curr.trans(0.0, -offset);
                     }
                 });
+
+                // Add some keybindings for testing out real-time interaction.
+                if let Some(k) = e.button_args() {
+                    if k.state == ButtonState::Press {
+                        match k.button {
+                            Button::Keyboard(Key::A) => {
+                                action_sx
+                                    .send(|personality| personality.increase_preference("avocado"));
+                            }
+                            _ => {}
+                        }
+                    }
+                };
             }
         } else {
             // Dummy receiver if we can't do visuals.
@@ -106,5 +133,9 @@ pub fn setup_display<'a>() -> RenderSender {
             }
         }
     });
-    sender
+
+    Display {
+        render: sender,
+        actions: action_rx,
+    }
 }

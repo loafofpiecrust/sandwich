@@ -106,7 +106,7 @@ impl Operation for Add {
     fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
         // Never add the requested ingredient if we don't have any more.
         if !personality.has_ingredient(&self.0) {
-            Some(Box::new(RemoveAll(self.0.clone())))
+            Some(Box::new(Remove(self.0.clone())))
         } else {
             None
         }
@@ -170,14 +170,12 @@ impl Operation for Remove {
 pub struct RemoveAll(pub Ingredient);
 impl Operation for RemoveAll {
     fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
-        let mut ingredients = sandwich.ingredients;
-        while let Some(idx) = ingredients.iter().position(|x| x.name == self.0.name) {
-            ingredients.remove(idx);
-        }
-        // Ingredient removal raises spite!
-        // Personality::upgrade_skill(&mut personality.spite);
         Sandwich {
-            ingredients,
+            ingredients: sandwich
+                .ingredients
+                .into_iter()
+                .filter(|x| x.name != self.0.name)
+                .collect(),
             ..sandwich
         }
     }
@@ -303,7 +301,7 @@ impl Operation for Ensure {
         sandwich
     }
     fn reverse(&self) -> Box<dyn Operation> {
-        Box::new(RemoveAll(self.0.clone()))
+        Box::new(Remove(self.0.clone()))
     }
     fn encode(&self, lang: &Personality) -> String {
         todo!()
@@ -441,7 +439,7 @@ impl Operation for CheckFor {
     fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
         // If we have the asked for ingredient, respond positively.
         if !personality.has_ingredient(&self.0) {
-            Some(Box::new(RemoveAll(self.0.clone())))
+            Some(Box::new(Remove(self.0.clone())))
         } else {
             Some(Box::new(Ensure(self.0.clone())))
         }

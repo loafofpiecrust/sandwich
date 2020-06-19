@@ -1,5 +1,5 @@
 use crate::{
-    display::{setup_display, Render, RenderSender},
+    display::{setup_display, Display, Render, RenderSender},
     grammar::{
         AnnotatedPhrase, Dictionary, DictionaryEntry, MeaningCloud, Weights, DEFAULT_WORD_MAP,
     },
@@ -62,7 +62,7 @@ pub struct Personality {
     #[serde(skip, default = "Dictionary::new")]
     pub dictionary: Dictionary,
     #[serde(skip, default = "setup_display")]
-    pub display: RenderSender,
+    pub display: Display,
     #[serde(skip)]
     pub last_lex: Option<AnnotatedPhrase>,
 }
@@ -166,20 +166,20 @@ impl Personality {
         println!("Upgraded language skill from {} => {}", orig, *x);
     }
     pub fn render(&self, state: Render) -> anyhow::Result<()> {
-        Ok(self.display.send(state)?)
+        Ok(self.display.render.send(state)?)
     }
-    pub fn increase_preference(&mut self, ingredient: &Ingredient) {
+    pub fn increase_preference(&mut self, name: &str) {
         // If we already have some preference for this ingredient, increase its severity.
         if let Some(pref) = self
             .preferences
             .iter_mut()
-            .find(|x| &x.ingredient == ingredient)
+            .find(|x| &x.ingredient.name == name)
         {
             pref.severity += 0.1;
         }
         // Otherwise, add a new preference with the base severity.
         self.preferences.push(Preference {
-            ingredient: ingredient.clone(),
+            ingredient: self.dictionary.ingredients.from_def(name).unwrap().clone(),
             severity: 0.1,
         });
     }

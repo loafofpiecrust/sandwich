@@ -92,6 +92,11 @@ impl Client {
         let (msg_sx, mut msg_rx) = channel(1);
         let recv_task = task::spawn(Self::receives_msgs(stream.clone(), msg_sx));
         loop {
+            // If there's been user interaction, make sure to apply the results.
+            while let Ok(action) = self.lang.display.actions.try_recv() {
+                action(&mut self.lang);
+            }
+
             // Save our personality frequently.
             self.lang.save()?;
 
@@ -212,6 +217,11 @@ impl Client {
         self.last_result = Sandwich::default();
         // Only break the loop when the order is complete.
         while !self.last_result.complete {
+            // If there's been user interaction, make sure to apply the results.
+            while let Ok(action) = self.lang.display.actions.try_recv() {
+                action(&mut self.lang);
+            }
+
             // Save our personality frequently.
             self.lang.save()?;
 

@@ -95,6 +95,22 @@ impl Ingredient {
         current
     }
 
+    /// Retrieve the ingredient that corresponds to the given word, based on the
+    /// single-syllable morphemes contained within.
+    /// Assumes that syllables and morphemes are always one-to-one.
+    pub fn from_def(&self, definition: &str) -> Option<&Ingredient> {
+        if self.name == definition {
+            Some(self)
+        } else {
+            self.children.as_ref().and_then(|children| {
+                children
+                    .iter()
+                    .filter_map(|child| child.from_def(definition))
+                    .next()
+            })
+        }
+    }
+
     pub fn to_word(&self, ingredient: &Ingredient, word_so_far: String) -> Option<String> {
         if self.name == ingredient.name {
             return Some(format!("{}{}", word_so_far, self.morpheme));
