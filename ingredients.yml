@@ -18,6 +18,27 @@ children:
       morpheme: pa
     - name: french-bread-top
       morpheme: pi
+  - name: burger-bun
+    morpheme: pe
+    children:
+    - name: burger-bun-bottom
+      morpheme: lo
+    - name: burger-bun-top
+      morpheme: lu
+  - name: toasted white bread
+    morpheme: hu
+    children:
+    - name: toasted-white-bread-bottom
+      morpheme: lo
+    - name: toasted-white-bread-top
+      morpheme: lu
+  - name: flour-tortilla
+    morpheme: to
+    children:
+    - name: flour-tortilla-bottom
+      morpheme: lo
+    - name: flour-tortilla-top
+      morpheme: lu
   # - name: white bread
   #   morpheme: ni
   #   children:
@@ -47,6 +68,8 @@ children:
   #   morpheme: pi
   - name: spinach
     morpheme: na
+  - name: cilantro
+    morpheme: si
   # - name: a/mystery-sprouts
   #   morpheme: wo
   # - name: a/alfalfa-sprouts
@@ -63,6 +86,8 @@ children:
       morpheme: pa
     - name: ham
       morpheme: ta
+    - name: pulled-pork
+      morpheme: po
   #   - name: a/ham
   #     morpheme: ta
   #   - name: a/deli-turkey
@@ -78,6 +103,15 @@ children:
   #     morpheme: si
   - name: fried-egg
     morpheme: lo
+  - name: red-beans
+    morpheme: pi
+  - name: portabello
+    morpheme: lo
+  - name: seafood
+    morpheme: si
+    children:
+    - name: shrimp
+      morpheme: me
 - name: fruit
   morpheme: na
   children:
@@ -98,6 +132,12 @@ children:
     morpheme: mu
   - name: pickled-onion
     morpheme: ho
+  - name: french-fries
+    morpheme: ne
+  - name: potato-chips
+    morpheme: la
+  - name: croquettes
+    morpheme: ke
 - name: spreads
   morpheme: sa
   children:
