@@ -45,9 +45,9 @@ pub trait Operation: std::fmt::Debug {
 pub struct Add(pub Ingredient, pub Relative);
 impl Operation for Add {
     fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
-        if !personality.has_ingredient(&self.0) {
-            return sandwich;
-        }
+        // if !personality.has_ingredient(&self.0) {
+        //     return sandwich;
+        // }
 
         let mut ingr = sandwich.ingredients;
         let idx = match &self.1 {
@@ -106,11 +106,11 @@ impl Operation for Add {
     }
     fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
         // Never add the requested ingredient if we don't have any more.
-        if !personality.has_ingredient(&self.0) {
-            Some(Box::new(Remove(self.0.clone())))
-        } else {
-            None
-        }
+        // if !personality.has_ingredient(&self.0) {
+        //     Some(Box::new(Remove(self.0.clone())))
+        // } else {
+        None
+        // }
     }
     fn question(&self) -> Box<dyn Operation> {
         Box::new(CheckFor(self.0.clone()))
@@ -502,12 +502,12 @@ impl Operation for CheckFor {
     }
     fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
         // If we have the asked for ingredient, respond positively.
-        if !personality.has_ingredient(&self.0) {
-            Some(Box::new(Remove(self.0.clone())))
-        } else {
-            None
-            // Some(Box::new(Ensure(self.0.clone())))
-        }
+        // if !personality.has_ingredient(&self.0) {
+        //     Some(Box::new(Remove(self.0.clone())))
+        // } else {
+        None
+        // Some(Box::new(Ensure(self.0.clone())))
+        // }
     }
     fn question(&self) -> Box<dyn Operation> {
         // A questioned question becomes a statement.

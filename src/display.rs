@@ -43,7 +43,7 @@ pub fn setup_display<'a>() -> Display {
                 encoder: window.factory.create_command_buffer().into(),
             };
             let scale = 12.0;
-            let offset = 1.0;
+            let offset = 15.0;
             let mut rng = thread_rng();
             let mut font = window.load_font("assets/OpenSans-Regular.ttf").unwrap();
             let mut texture_map = HashMap::new();
