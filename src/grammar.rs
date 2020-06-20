@@ -20,7 +20,7 @@ lazy_static! {
             .words
             .iter()
             // TODO Put this into a static list to prevent code duplication.
-            .filter(|(_, x)| x.function != WordFunction::Affirmation && x.function != WordFunction::Greeting && x.function != WordFunction::Negation && x.function != WordFunction::Ingredient)
+            .filter(|(_, x)| x.function != WordFunction::Affirmation && x.function != WordFunction::Greeting)
             .map(|(_, e)| (e.clone(), 1))
             .collect();
         dict
