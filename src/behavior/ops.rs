@@ -571,11 +571,13 @@ impl Order {
     pub fn last_op_successful(&self, personality: &mut Personality, result: &Sandwich) -> bool {
         // First, apply the last operation to the last result.
         // Then, check if that matches the current result.
-        let op = self.last_op();
         if let Some(op) = self.last_op() {
-            if let Some(last_res) = self.last_result.clone() {
-                let imagined_result = op.apply(last_res, personality);
-                return imagined_result.ingredients == result.ingredients;
+            if let Some(last_res) = self.last_result.as_ref() {
+                let imagined_result = op.apply(last_res.clone(), personality);
+                // Only successful if there was some difference *and* it was the
+                // correct difference.
+                return last_res.ingredients != imagined_result.ingredients
+                    && imagined_result.ingredients == result.ingredients;
             }
         }
         false
@@ -620,6 +622,14 @@ impl Order {
         // We want to add the next one!
         let mut next_idx = last_shared.map(|(i, _)| i + 1).unwrap_or(0);
         println!("next index we want: {}", next_idx);
+
+        // Always add the base bread first.
+        if next_idx == 0 {
+            return Some(Box::new(Add(
+                self.desired.ingredients[next_idx].clone(),
+                Relative::Top,
+            )));
+        }
 
         // Maybe forget this ingredient and move on to the next one.
         if rng.gen_bool(personality.forgetfulness) {
