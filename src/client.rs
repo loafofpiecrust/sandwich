@@ -89,6 +89,9 @@ impl Client {
 
         // No greeting for now, treating the TCP connection itself as the greeting.
         let mut order = Order::new(&self.lang);
+
+        println!("desired sandwich: {:?}", order.desired);
+
         let (msg_sx, mut msg_rx) = channel(1);
         let recv_task = task::spawn(Self::receives_msgs(stream.clone(), msg_sx));
         loop {

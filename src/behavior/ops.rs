@@ -449,6 +449,34 @@ impl Operation for Negate {
     }
 }
 
+/// Negates the last operation we requested, operates practically as a negative
+/// response to a question.
+#[derive(Debug)]
+pub struct NegateLast;
+impl Operation for NegateLast {
+    fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
+        todo!()
+    }
+    fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
+        todo!()
+    }
+    fn reverse(&self) -> Box<dyn Operation> {
+        todo!()
+    }
+    fn question(&self) -> Box<dyn Operation> {
+        todo!()
+    }
+    fn encode(&self, lang: &Personality) -> String {
+        todo!()
+    }
+    fn is_persistent(&self) -> bool {
+        todo!()
+    }
+    fn skills(&self) -> Language {
+        todo!()
+    }
+}
+
 /// TODO Consider turning this into a generic question wrapper. Adds the
 /// modifier, makes no application, but must send a response. Think on it.
 #[derive(Debug)]
@@ -477,7 +505,8 @@ impl Operation for CheckFor {
         if !personality.has_ingredient(&self.0) {
             Some(Box::new(Remove(self.0.clone())))
         } else {
-            Some(Box::new(Ensure(self.0.clone())))
+            None
+            // Some(Box::new(Ensure(self.0.clone())))
         }
     }
     fn question(&self) -> Box<dyn Operation> {
