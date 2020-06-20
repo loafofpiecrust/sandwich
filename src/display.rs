@@ -60,7 +60,7 @@ pub fn setup_display<'a>() -> Display {
                             rotations.truncate(ingr.len());
                         } else {
                             while rotations.len() < ingr.len() {
-                                rotations.push(rng.gen_range(0.0, 365.0));
+                                rotations.push(rng.gen_range(-15.0, 15.0));
                             }
                         }
 
@@ -109,9 +109,11 @@ pub fn setup_display<'a>() -> Display {
                         };
                         let transform = c
                             .transform
-                            .trans(400.0, 200.0 - offset * idx as f64)
+                            .trans(500.0, 600.0 - offset * idx as f64)
                             .rot_deg(rot)
-                            .scale(scale, scale);
+                            .scale(scale, scale)
+                            // Anchor elements at theit center point.
+                            .trans(-16.0, -16.0);
                         image(t, transform, g);
                     }
                 });
