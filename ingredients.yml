@@ -36,6 +36,8 @@ children:
   #   morpheme: ke
   - name: fresh-mozzerella
     morpheme: me
+  - name: cheddar-cheese
+    morpheme: se
 - name: greens
   morpheme: we
   children:
@@ -57,6 +59,10 @@ children:
     children:
     - name: bacon
       morpheme: ti
+    - name: beef-patty
+      morpheme: pa
+    - name: ham
+      morpheme: ta
   #   - name: a/ham
   #     morpheme: ta
   #   - name: a/deli-turkey
@@ -75,8 +81,6 @@ children:
 - name: fruit
   morpheme: na
   children:
-  # - name: avocado
-  #   morpheme: so
   - name: tomato
     morpheme: pe
   - name: olives
@@ -84,13 +88,30 @@ children:
   - name: cucumber
     morpheme: pa
   - name: avocado
-    morpheme: to
+    morpheme: so
 - name: vegetables
   morpheme: ki
   children:
   - name: green-pepper
     morpheme: ki
-  # - name: onions
-  #   morpheme: ho
   - name: shredded-carrots
     morpheme: mu
+  - name: pickled-onion
+    morpheme: ho
+- name: spreads
+  morpheme: sa
+  children:
+  - name: sauce
+    morpheme: sa
+    children:
+    - name: ketchup
+      morpheme: ke
+    - name: mustard
+      morpheme: mu
+  - name: solids
+    morpheme: li
+    children:
+    - name: peanut-butter
+      morpheme: su
+
+  
