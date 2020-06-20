@@ -101,15 +101,18 @@ pub fn setup_display<'a>() -> Display {
                     font.factory.encoder.flush(d);
 
                     // Render all the ingredients as stacked images.
-                    let mut curr = c.transform.trans(400.0, 200.0).scale(scale, scale);
                     for (idx, t) in textures.iter().enumerate() {
                         let rot = if idx == 0 || idx == textures.len() - 1 {
                             0.0
                         } else {
                             rotations[idx]
                         };
-                        image(t, curr.rot_deg(rot), g);
-                        curr = curr.trans(0.0, -offset);
+                        let transform = c
+                            .transform
+                            .trans(400.0, 200.0 - offset * idx as f64)
+                            .rot_deg(rot)
+                            .scale(scale, scale);
+                        image(t, transform, g);
                     }
                 });
 
