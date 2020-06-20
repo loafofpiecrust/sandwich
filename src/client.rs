@@ -95,8 +95,16 @@ impl Client {
         let (msg_sx, mut msg_rx) = channel(1);
         let recv_task = task::spawn(Self::receives_msgs(stream.clone(), msg_sx));
         loop {
-            // If there's been user interaction, make sure to apply the results.
-            while let Ok(action) = self.lang.display.actions.try_recv() {
+            // Wait some time between each of our requests.
+            // TODO Some machines may wait for responses before sending the
+            // next operation. Or start waiting if there's a buffer of
+            // messages that haven't been acknowledged.
+            // TODO Change wait time based on shyness/politeness
+            let wait_time = Duration::from_millis(rng.gen_range(
+                300 * (self.lang.shyness * 10.0) as u64,
+                1000 * (self.lang.politeness * 10.0) as u64,
+            ));
+            while let Ok(action) = self.lang.display.actions.recv_timeout(wait_time) {
                 action(&mut self.lang);
             }
 
@@ -153,12 +161,6 @@ impl Client {
                 self.say_and_send(&mut stream, &*op, None).await?;
                 // Send this operation to our history box.
                 order.archive(op);
-                // Wait some time between each of our requests.
-                // TODO Some machines may wait for responses before sending the
-                // next operation. Or start waiting if there's a buffer of
-                // messages that haven't been acknowledged.
-                // TODO Change wait time based on shyness/politeness
-                task::sleep(Duration::from_millis(rng.gen_range(700, 1500))).await;
             } else {
                 // Break the loop if there's no more operations to make!
                 println!("the sandwich is finished!");
