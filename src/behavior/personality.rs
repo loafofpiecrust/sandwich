@@ -1,7 +1,8 @@
 use crate::{
     display::{setup_display, Display, Render, RenderSender},
     grammar::{
-        AnnotatedPhrase, Dictionary, DictionaryEntry, MeaningCloud, Weights, DEFAULT_WORD_MAP,
+        AnnotatedPhrase, Dictionary, DictionaryEntry, MeaningCloud, Weights, WordFunction,
+        DEFAULT_WORD_MAP,
     },
     sandwich::{Ingredient, Sandwich, BG_COLORS},
 };
@@ -120,13 +121,25 @@ impl Personality {
         self.inventory.iter().map(|(_, count)| count).sum()
     }
 
+    /// Retrieve the meaning distribution for a particular word.
+    /// If we find no matching entry, create one with equal weights for all definitions.
     pub fn get_cloud_entry(&self, key: &str) -> &Weights<DictionaryEntry> {
         self.cloud.get(key).unwrap_or(&DEFAULT_WORD_MAP)
     }
 
-    // /// Retrieve the meaning distribution for a particular word.
-    // /// If we find no matching entry, create one with equal weights for all definitions.
-    // pub fn cloud_entry(&self) ->
+    pub fn improve_match(&mut self, key: &str, def: WordFunction) {
+        let weights = self
+            .cloud
+            .entry(key.to_owned())
+            .or_insert(DEFAULT_WORD_MAP.clone());
+        // Find the weight matching the dictionary entry we used in this lex.
+        if let Some(entry) = weights.iter_mut().find(|(e, _)| e.function == def) {
+            // Increase the score of this one!
+            // TODO Use some gradient so that an early success counts for a lot?
+            entry.1 += 1;
+        }
+    }
+
     pub fn load() -> anyhow::Result<Self> {
         let f = File::open("personality.yaml")?;
         Ok(serde_yaml::from_reader(&f)?)

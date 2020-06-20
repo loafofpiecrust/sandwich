@@ -36,7 +36,7 @@ pub struct Client {
     behaviors: Vec<Box<dyn Behavior>>,
     pub sandwich: Option<Sandwich>,
     pub lang: Personality,
-    encoder: Box<dyn Encoder>,
+    // encoder: Box<dyn Encoder>,
     last_result: Sandwich,
 }
 impl Client {
@@ -47,7 +47,7 @@ impl Client {
             sandwich: None,
             // Make a new personality if there's none saved.
             lang: Personality::load().unwrap_or_else(|_| Personality::new()),
-            encoder: Box::new(RelativeEncoder::new(0.8, DesireEncoder)),
+            // encoder: Box::new(RelativeEncoder::new(0.8, DesireEncoder)),
             last_result: Sandwich::default(),
         }
     }
@@ -131,6 +131,12 @@ impl Client {
                     println!("Received response op: {:?}", operation);
                     order.desired = operation.apply(order.desired.clone(), &mut self.lang);
                     self.lang.last_lex = Some(lex);
+
+                    // If we asked a question that caused a change in our
+                    // sandwich, affirm that we understood it.
+                    if order.last_question_failed(&mut self.lang, &self.last_result) {
+                        order.desired = ops::Affirm.apply(order.desired.clone(), &mut self.lang);
+                    }
                 }
             }
 
@@ -178,7 +184,9 @@ impl Client {
         op: &dyn Operation,
         sandwich: Option<Sandwich>,
     ) -> anyhow::Result<()> {
-        let s = op.encode(&self.lang);
+        // TODO Save this encoding as the last lex of our own phrase.
+        let phrase = op.encode(&self.lang);
+        let s = phrase.into_iter().map(|x| x.word.to_string()).join(" ");
         self.say_phrase(&s, sandwich.clone()).await?;
         let message = Message::new(Some(s.to_string()), sandwich);
         message.send(stream).await?;
@@ -370,21 +378,21 @@ impl Client {
         }
         Ok(())
     }
-    async fn end_order(&mut self, other: &mut TcpStream) -> anyhow::Result<()> {
-        for b in &self.behaviors {
-            b.end();
-        }
-        let sandwich = self.greet(other).await?;
-        self.state.respond(
-            &PhraseNode::Empty,
-            sandwich.as_ref(),
-            &self.lang,
-            &mut *self.encoder,
-            &mut self.behaviors,
-        );
-        // self.sandwich = None;
-        Ok(())
-    }
+    // async fn end_order(&mut self, other: &mut TcpStream) -> anyhow::Result<()> {
+    //     for b in &self.behaviors {
+    //         b.end();
+    //     }
+    //     let sandwich = self.greet(other).await?;
+    //     self.state.respond(
+    //         &PhraseNode::Empty,
+    //         sandwich.as_ref(),
+    //         &self.lang,
+    //         &mut *self.encoder,
+    //         &mut self.behaviors,
+    //     );
+    //     // self.sandwich = None;
+    //     Ok(())
+    // }
     async fn greet(&self, other: &mut TcpStream) -> anyhow::Result<Option<Sandwich>> {
         let (hello, _) = self.lang.dictionary.word_for_def(WordFunction::Greeting);
 

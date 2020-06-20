@@ -49,6 +49,10 @@ impl Dictionary {
 
         Self { words, ingredients }
     }
+    pub fn annotated_word_for_def(&self, category: WordFunction) -> AnnotatedWord {
+        let w = self.word_for_def(category);
+        AnnotatedWord::from_dict(w.0, w.1)
+    }
     pub fn word_for_def(&self, category: WordFunction) -> (&str, &DictionaryEntry) {
         for (word, entry) in &self.words {
             if entry.function == category {
@@ -56,6 +60,10 @@ impl Dictionary {
             }
         }
         unreachable!("There should be at least one word per function.")
+    }
+    pub fn annotated_word_for_num(&self, number: u32) -> AnnotatedWord {
+        let w = self.word_for_num(number);
+        AnnotatedWord::from_dict(w.0, w.1)
     }
     pub fn word_for_num(&self, number: u32) -> (&str, &DictionaryEntry) {
         let num_str = number.to_string();
@@ -158,10 +166,16 @@ pub struct AnnotatedWord {
     // TODO: Syllables -> Morphemes
     pub word: Word,
     /// Part of speech based on syntactic context
-    pub role: Option<WordRole>,
+    // pub role: Option<WordRole>,
     pub entry: Option<DictionaryEntry>,
 }
 impl AnnotatedWord {
+    pub fn from_dict(text: &str, entry: &DictionaryEntry) -> Self {
+        Self {
+            word: self::word(text.as_bytes()).unwrap().1,
+            entry: Some(entry.clone()),
+        }
+    }
     pub fn definition(&self) -> Option<&WordFunction> {
         self.entry.as_ref().map(|e| &e.function)
     }
@@ -209,7 +223,7 @@ pub fn annotate(phrase: Phrase, context: &Personality) -> AnnotatedPhrase {
         result.push(AnnotatedWord {
             word,
             // TODO: Use syntactic context for word role.
-            role: entry.map(|e| e.role.clone()),
+            // role: entry.map(|e| e.role.clone()),
             entry: entry.cloned(),
         });
     }
@@ -225,7 +239,7 @@ pub fn sentence_new(input: &[u8], lang: &Personality) -> Option<Parsed> {
             // Try again with unknown words removed.
             let nt = tagged
                 .into_iter()
-                .filter(|x| x.role.is_some() || x.entry.is_some())
+                .filter(|x| x.entry.as_ref().map(|x| x.role).is_some() || x.entry.is_some())
                 .collect_vec();
             let c = sentence(&nt, lang);
             c.ok().map(|(_, t)| t)
@@ -347,7 +361,7 @@ impl PhraseNode {
 }
 
 pub fn noun(input: &[AnnotatedWord]) -> IResult<&[AnnotatedWord], PhraseNode> {
-    if input.len() > 0 && input[0].role == Some(WordRole::Noun) {
+    if input.len() > 0 && input[0].entry.as_ref().map(|e| e.role) == Some(WordRole::Noun) {
         let rest = &input[1..];
         Ok((rest, PhraseNode::Noun(input[0].clone())))
     } else {
@@ -385,7 +399,7 @@ pub fn word_with_role(
     input: &[AnnotatedWord],
     role: WordRole,
 ) -> IResult<&[AnnotatedWord], &AnnotatedWord> {
-    if input.len() > 0 && input[0].role == Some(role) {
+    if input.len() > 0 && input[0].entry.as_ref().map(|x| x.role) == Some(role) {
         let rest = &input[1..];
         Ok((rest, &input[0]))
     } else {
@@ -610,7 +624,7 @@ fn prob_word_with_def<'a>(
                 &input[1..],
                 AnnotatedWord {
                     word: word(d.as_bytes()).unwrap().1,
-                    role: Some(choice.0.role.clone()),
+                    // role: Some(choice.0.role.clone()),
                     entry: Some(choice.0.clone()),
                 },
             ));
@@ -635,7 +649,7 @@ fn prob_word_with_role<'a>(
                 &input[1..],
                 AnnotatedWord {
                     word: word(d.as_bytes()).unwrap().1,
-                    role: Some(choice.0.role.clone()),
+                    // role: Some(choice.0.role.clone()),
                     entry: Some(choice.0.clone()),
                 },
             ));
@@ -750,7 +764,7 @@ pub fn prob_annotate(phrase: &Phrase, context: &Personality) -> AnnotatedPhrase 
         result.push(AnnotatedWord {
             word: word.clone(),
             // TODO: Use syntactic context for word role.
-            role: Some(entry.role.clone()),
+            // role: Some(entry.role.clone()),
             entry: Some(entry.clone()),
         });
     }

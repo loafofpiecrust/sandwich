@@ -1,4 +1,5 @@
 use crate::behavior::Operation;
+use crate::grammar;
 use crate::grammar::*;
 use itertools::Itertools;
 use rand::prelude::*;
@@ -109,6 +110,19 @@ impl Ingredient {
                     .next()
             })
         }
+    }
+
+    pub fn to_annotated_word(&self, ingredient: &Ingredient) -> AnnotatedWord {
+        let w = self.to_word(ingredient, String::new());
+        w.map(|w| AnnotatedWord {
+            word: grammar::word(w.as_bytes()).unwrap().1,
+            entry: Some(DictionaryEntry {
+                function: WordFunction::Ingredient,
+                role: WordRole::Noun,
+                definition: ingredient.name.clone(),
+            }),
+        })
+        .unwrap()
     }
 
     pub fn to_word(&self, ingredient: &Ingredient, word_so_far: String) -> Option<String> {

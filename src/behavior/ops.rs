@@ -21,7 +21,9 @@
 
 use crate::{
     behavior::{Language, Personality},
-    grammar::{WordFunction, DEFAULT_WORD_MAP},
+    grammar::{
+        self, AnnotatedPhrase, AnnotatedWord, DictionaryEntry, WordFunction, DEFAULT_WORD_MAP,
+    },
     sandwich::{Ingredient, Sandwich},
 };
 use async_std::net::TcpStream;
@@ -35,7 +37,7 @@ pub trait Operation: std::fmt::Debug {
     fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>>;
     fn reverse(&self) -> Box<dyn Operation>;
     fn question(&self) -> Box<dyn Operation>;
-    fn encode(&self, lang: &Personality) -> String;
+    fn encode(&self, lang: &Personality) -> AnnotatedPhrase;
     fn is_persistent(&self) -> bool;
     fn skills(&self) -> Language;
 }
@@ -72,28 +74,29 @@ impl Operation for Add {
     fn reverse(&self) -> Box<dyn Operation> {
         Box::new(Remove(self.0.clone()))
     }
-    fn encode(&self, lang: &Personality) -> String {
+    fn encode(&self, lang: &Personality) -> AnnotatedPhrase {
         // Encode prepositional phrase.
         // TODO Use language weight for whether to actually use the adposition.
-        let prep = match &self.1 {
+        let mut prep = match &self.1 {
             Relative::Before(other) => {
-                let p = lang.dictionary.word_for_def(WordFunction::Before);
-                let n = lang.dictionary.ingredients.to_word(&other, String::new());
-                format!("{} {} ", n.unwrap(), p.0)
+                let p = lang.dictionary.annotated_word_for_def(WordFunction::Before);
+                let n = lang.dictionary.ingredients.to_annotated_word(&other);
+                vec![n, p]
             }
             Relative::After(other) => {
-                let p = lang.dictionary.word_for_def(WordFunction::After);
-                let n = lang.dictionary.ingredients.to_word(&other, String::new());
-                format!("{} {} ", n.unwrap(), p.0)
+                let p = lang.dictionary.annotated_word_for_def(WordFunction::After);
+                let n = lang.dictionary.ingredients.to_annotated_word(&other);
+                vec![n, p]
             }
-            Relative::Top => String::new(),
+            Relative::Top => vec![],
         };
 
         // Get the word for our verb and ingredient.
-        let verb = lang.dictionary.word_for_def(WordFunction::Desire);
-        let obj = lang.dictionary.ingredients.to_word(&self.0, String::new());
-        // TODO Change by word order.
-        format!("{}{} {}", prep, obj.unwrap(), verb.0)
+        let want = lang.dictionary.annotated_word_for_def(WordFunction::Desire);
+        let ingr = lang.dictionary.ingredients.to_annotated_word(&self.0);
+        prep.push(ingr);
+        prep.push(want);
+        prep
     }
     fn is_persistent(&self) -> bool {
         false
@@ -152,9 +155,13 @@ impl Operation for Remove {
     fn reverse(&self) -> Box<dyn Operation> {
         Box::new(Add(self.0.clone(), Relative::Top))
     }
-    fn encode(&self, lang: &Personality) -> String {
-        let neg = lang.dictionary.word_for_def(WordFunction::Negation);
-        format!("{} {}", neg.0, self.reverse().encode(lang))
+    fn encode(&self, lang: &Personality) -> AnnotatedPhrase {
+        let mut phrase = self.reverse().encode(lang);
+        let neg = lang
+            .dictionary
+            .annotated_word_for_def(WordFunction::Negation);
+        phrase.insert(0, neg);
+        phrase
     }
     fn is_persistent(&self) -> bool {
         false
@@ -189,7 +196,7 @@ impl Operation for RemoveAll {
     fn reverse(&self) -> Box<dyn Operation> {
         Box::new(Ensure(self.0.clone()))
     }
-    fn encode(&self, lang: &Personality) -> String {
+    fn encode(&self, lang: &Personality) -> AnnotatedPhrase {
         todo!()
     }
     fn is_persistent(&self) -> bool {
@@ -221,9 +228,11 @@ impl Operation for Finish {
     fn reverse(&self) -> Box<dyn Operation> {
         Box::new(self.clone())
     }
-    fn encode(&self, lang: &Personality) -> String {
-        let bye = lang.dictionary.word_for_def(WordFunction::Greeting);
-        bye.0.into()
+    fn encode(&self, lang: &Personality) -> AnnotatedPhrase {
+        let bye = lang
+            .dictionary
+            .annotated_word_for_def(WordFunction::Greeting);
+        vec![bye]
     }
     fn is_persistent(&self) -> bool {
         false
@@ -253,9 +262,11 @@ impl Operation for Repeat {
     fn reverse(&self) -> Box<dyn Operation> {
         Box::new(Self(self.0, self.1.reverse()))
     }
-    fn encode(&self, lang: &Personality) -> String {
-        let num = lang.dictionary.word_for_num(self.0);
-        format!("{} {}", num.0, self.1.encode(lang))
+    fn encode(&self, lang: &Personality) -> AnnotatedPhrase {
+        let mut phrase = self.1.encode(lang);
+        let num = lang.dictionary.annotated_word_for_num(self.0);
+        phrase.insert(0, num);
+        phrase
     }
     fn is_persistent(&self) -> bool {
         false
@@ -288,10 +299,13 @@ impl Operation for Compound {
     fn reverse(&self) -> Box<dyn Operation> {
         Box::new(Compound(self.0.reverse(), self.1.reverse()))
     }
-    fn encode(&self, lang: &Personality) -> String {
-        let conj = lang.dictionary.word_for_def(WordFunction::And);
+    fn encode(&self, lang: &Personality) -> AnnotatedPhrase {
+        let mut phrase = self.0.encode(lang);
+        let conj = lang.dictionary.annotated_word_for_def(WordFunction::And);
         // Conjunction goes between two sub-phrases.
-        format!("{} {} {}", self.0.encode(lang), conj.0, self.1.encode(lang))
+        phrase.push(conj);
+        phrase.append(&mut self.1.encode(lang));
+        phrase
     }
     fn is_persistent(&self) -> bool {
         false
@@ -322,7 +336,7 @@ impl Operation for Ensure {
     fn reverse(&self) -> Box<dyn Operation> {
         Box::new(Remove(self.0.clone()))
     }
-    fn encode(&self, lang: &Personality) -> String {
+    fn encode(&self, lang: &Personality) -> AnnotatedPhrase {
         todo!()
     }
     fn is_persistent(&self) -> bool {
@@ -350,9 +364,11 @@ impl Operation for Persist {
     fn reverse(&self) -> Box<dyn Operation> {
         Box::new(Persist(self.0.reverse()))
     }
-    fn encode(&self, lang: &Personality) -> String {
-        let ever = lang.dictionary.word_for_def(WordFunction::Ever);
-        format!("{} {}", ever.0, self.0.encode(lang))
+    fn encode(&self, lang: &Personality) -> AnnotatedPhrase {
+        let mut p = self.0.encode(lang);
+        let ever = lang.dictionary.annotated_word_for_def(WordFunction::Ever);
+        p.insert(0, ever);
+        p
     }
     fn is_persistent(&self) -> bool {
         true
@@ -381,19 +397,7 @@ impl Operation for Affirm {
             for w in &lex {
                 let dict_entry = w.entry.as_ref().unwrap();
                 let s = w.word.to_string();
-                let weights = personality
-                    .cloud
-                    .entry(s)
-                    .or_insert(DEFAULT_WORD_MAP.clone());
-                // Find the weight matching the dictionary entry we used in this lex.
-                if let Some(entry) = weights
-                    .iter_mut()
-                    .find(|(e, _)| e.definition == dict_entry.definition)
-                {
-                    // Increase the score of this one!
-                    // TODO Use some gradient so that an early success counts for a lot?
-                    entry.1 += 1;
-                }
+                personality.improve_match(&s, dict_entry.function);
             }
         }
 
@@ -402,9 +406,11 @@ impl Operation for Affirm {
     fn reverse(&self) -> Box<dyn Operation> {
         todo!("Add pure negation operation")
     }
-    fn encode(&self, lang: &Personality) -> String {
-        let w = lang.dictionary.word_for_def(WordFunction::Affirmation).0;
-        format!("{}", w)
+    fn encode(&self, lang: &Personality) -> AnnotatedPhrase {
+        let w = lang
+            .dictionary
+            .annotated_word_for_def(WordFunction::Affirmation);
+        vec![w]
     }
     fn is_persistent(&self) -> bool {
         false
@@ -431,9 +437,11 @@ impl Operation for Negate {
     fn reverse(&self) -> Box<dyn Operation> {
         Box::new(Affirm)
     }
-    fn encode(&self, lang: &Personality) -> String {
-        let w = lang.dictionary.word_for_def(WordFunction::Negation).0;
-        format!("{}", w)
+    fn encode(&self, lang: &Personality) -> AnnotatedPhrase {
+        let w = lang
+            .dictionary
+            .annotated_word_for_def(WordFunction::Negation);
+        vec![w]
     }
     fn is_persistent(&self) -> bool {
         false
@@ -466,7 +474,7 @@ impl Operation for NegateLast {
     fn question(&self) -> Box<dyn Operation> {
         todo!()
     }
-    fn encode(&self, lang: &Personality) -> String {
+    fn encode(&self, lang: &Personality) -> AnnotatedPhrase {
         todo!()
     }
     fn is_persistent(&self) -> bool {
@@ -488,11 +496,13 @@ impl Operation for CheckFor {
     fn reverse(&self) -> Box<dyn Operation> {
         todo!()
     }
-    fn encode(&self, lang: &Personality) -> String {
-        let q = lang.dictionary.word_for_def(WordFunction::Question).0;
-        let verb = lang.dictionary.word_for_def(WordFunction::Have).0;
-        let n = lang.dictionary.ingredients.to_word(&self.0, String::new());
-        format!("{} {} {}", q, n.unwrap(), verb)
+    fn encode(&self, lang: &Personality) -> AnnotatedPhrase {
+        let q = lang
+            .dictionary
+            .annotated_word_for_def(WordFunction::Question);
+        let verb = lang.dictionary.annotated_word_for_def(WordFunction::Have);
+        let n = lang.dictionary.ingredients.to_annotated_word(&self.0);
+        vec![q, n, verb]
     }
     fn is_persistent(&self) -> bool {
         false
@@ -568,16 +578,30 @@ impl Order {
     pub fn last_op(&self) -> Option<&dyn Operation> {
         self.history.last().map(|x| &**x)
     }
+
     pub fn last_op_successful(&self, personality: &mut Personality, result: &Sandwich) -> bool {
         // First, apply the last operation to the last result.
         // Then, check if that matches the current result.
         if let Some(op) = self.last_op() {
             if let Some(last_res) = self.last_result.as_ref() {
                 let imagined_result = op.apply(last_res.clone(), personality);
-                // Only successful if there was some difference *and* it was the
-                // correct difference.
+                // Only successful if there was some intended difference *and*
+                // it was the correct difference.
                 return last_res.ingredients != imagined_result.ingredients
                     && imagined_result.ingredients == result.ingredients;
+            }
+        }
+        false
+    }
+
+    pub fn last_question_failed(&self, personality: &mut Personality, result: &Sandwich) -> bool {
+        if let Some(op) = self.last_op() {
+            if let Some(last_res) = self.last_result.as_ref() {
+                let imagined_result = op.apply(last_res.clone(), personality);
+                // Make sure it's a question (doesn't affect our sandwich).
+                let is_question = last_res.ingredients == imagined_result.ingredients;
+                // Negative result if our sandwich had to change because of the answer.
+                return is_question && imagined_result.ingredients != result.ingredients;
             }
         }
         false
