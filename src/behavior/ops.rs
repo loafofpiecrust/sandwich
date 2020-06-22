@@ -727,7 +727,7 @@ impl Order {
         }
 
         // TODO Change my mind about what I want based on my favorites.
-        if rng.gen_bool(personality.spontaneity * personality.stress()) {
+        if rng.gen_bool((personality.spontaneity * personality.stress()).min(0.9)) {
             // If our previous desires contain too few of our favorites, then
             // add one in.
             let any_favs = self.desired.ingredients.iter().any(|x| {

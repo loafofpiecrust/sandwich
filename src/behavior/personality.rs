@@ -250,7 +250,7 @@ impl Personality {
         // Preferences and allergies could override each other applying to the
         // same ingredient.
         for fav in &self.preferences {
-            if rng.gen_bool((fav.severity * self.stress()).min(1.0)) {
+            if rng.gen_bool((fav.severity * self.stress()).min(0.9)) {
                 ingredients.push(fav.ingredient.clone());
                 len -= 1;
             }
