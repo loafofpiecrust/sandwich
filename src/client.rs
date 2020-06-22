@@ -60,7 +60,7 @@ impl Client {
                 s = client => self.new_customer(s.0?, s.1).await,
                 s = server => self.new_server(s.0?, s.1).await,
             };
-            r?;
+            dbg!(r);
         }
     }
 
@@ -203,18 +203,6 @@ impl Client {
         message.send(stream).await?;
         Ok(())
     }
-
-    // async fn say_and_send(
-    //     &self,
-    //     op: Box<dyn Operation>,
-    //     stream: &mut TcpStream,
-    // ) -> anyhow::Result<()> {
-    //     let s = op.encode(&self.lang);
-    //     self.say_phrase(&s, None);
-    //     let msg = Message::new(Some(s), None);
-    //     msg.send(&mut stream).await?;
-    //     Ok(())
-    // }
 
     async fn new_server(
         &mut self,
