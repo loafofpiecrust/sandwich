@@ -266,7 +266,7 @@ impl Client {
                 operation: mut op,
                 lang: lang_change,
                 lex,
-            }) = self.parse(&msg.text.unwrap())
+            }) = msg.text.and_then(|t| self.parse(&t))
             {
                 // Apply all persistent operations at every turn.
                 for passive_op in &order.persistent_ops {
@@ -414,27 +414,27 @@ impl Client {
     //     // self.sandwich = None;
     //     Ok(())
     // }
-    async fn greet(&self, other: &mut TcpStream) -> anyhow::Result<Option<Sandwich>> {
-        let (hello, _) = self.lang.dictionary.word_for_def(WordFunction::Greeting);
+    // async fn greet(&self, other: &mut TcpStream) -> anyhow::Result<Option<Sandwich>> {
+    //     let (hello, _) = self.lang.dictionary.word_for_def(WordFunction::Greeting);
 
-        // self.say_phrase(hello, None, other).await?;
+    //     // self.say_phrase(hello, None, other).await?;
 
-        // And wait for a response!
-        let resp: String = {
-            let mut buf = [0; 512];
-            other.read(&mut buf).await?;
-            bincode::deserialize(&buf)?
-        };
-        let sandwich: Option<Sandwich> = {
-            let mut buf = [0; 512];
-            other.read(&mut buf).await?;
-            bincode::deserialize(&buf)?
-        };
+    //     // And wait for a response!
+    //     let resp: String = {
+    //         let mut buf = [0; 512];
+    //         other.read(&mut buf).await?;
+    //         bincode::deserialize(&buf)?
+    //     };
+    //     let sandwich: Option<Sandwich> = {
+    //         let mut buf = [0; 512];
+    //         other.read(&mut buf).await?;
+    //         bincode::deserialize(&buf)?
+    //     };
 
-        println!("{}", resp);
-        println!("Received sandwich: {:?}", sandwich);
-        Ok(sandwich)
-    }
+    //     println!("{}", resp);
+    //     println!("Received sandwich: {:?}", sandwich);
+    //     Ok(sandwich)
+    // }
     // pub fn next_phrase(&mut self) -> Option<String> {
     //     let sandwich = self.sandwich.as_ref().unwrap();
 
