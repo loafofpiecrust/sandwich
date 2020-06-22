@@ -32,6 +32,8 @@ use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 
+/// An operation makes some change to a sandwich based on its internal structure
+/// and the [Personality] passed to it.
 pub trait Operation: std::fmt::Debug {
     fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich;
     fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>>;
@@ -47,6 +49,7 @@ pub trait Operation: std::fmt::Debug {
 pub struct Add(pub Ingredient, pub Relative);
 impl Operation for Add {
     fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
+        // FIXME
         // if !personality.has_ingredient(&self.0) {
         //     return sandwich;
         // }
@@ -395,9 +398,10 @@ impl Operation for Affirm {
             // For each word in the lex, update its' weight in the association table.
             println!("last lex: {:?}", lex);
             for w in &lex {
-                let dict_entry = w.entry.as_ref().unwrap();
-                let s = w.word.to_string();
-                personality.improve_match(&s, dict_entry.function);
+                if let Some(dict_entry) = w.entry.as_ref() {
+                    let s = w.word.to_string();
+                    personality.improve_match(&s, dict_entry.function);
+                }
             }
         }
 
@@ -555,15 +559,13 @@ impl Operation for CheckFor {
 
 pub struct Order {
     pub desired: Sandwich,
-    forgotten: Vec<Box<dyn Operation>>,
     history: Vec<Box<dyn Operation>>,
     last_result: Option<Sandwich>,
-    persistent_ops: Vec<Box<dyn Operation>>,
+    pub persistent_ops: Vec<Box<dyn Operation>>,
 }
 impl Order {
     pub fn new(lang: &Personality) -> Self {
         Self {
-            forgotten: Vec::new(),
             history: Vec::new(),
             // TODO Pick a sandwich based on our personality.
             desired: lang.gen_sandwich(7),
@@ -672,7 +674,7 @@ impl Order {
             .position(|x| !result.ingredients.contains(x));
         // If we aren't shy, try to correct a mistake!
         if mistake.is_some()
-            && !rng.gen_bool(personality.shyness)
+            && !rng.gen_bool(personality.shyness / personality.stress())
             && rng.gen_bool(personality.adposition * 2.0)
         {
             let idx = mistake.unwrap();
@@ -717,7 +719,7 @@ impl Order {
             // If the allergy is severe and we aren't shy about it, ask for that
             // ingredient to be removed.
             if rng.gen_bool(allergen.severity)
-                && !rng.gen_bool(personality.shyness)
+                && !rng.gen_bool(personality.shyness / personality.stress())
                 && rng.gen_bool(personality.adverbs * 2.0)
             {
                 return Some(Box::new(Remove(allergen.ingredient.clone())));
@@ -725,7 +727,7 @@ impl Order {
         }
 
         // TODO Change my mind about what I want based on my favorites.
-        if rng.gen_bool(personality.spontaneity) {
+        if rng.gen_bool(personality.spontaneity * personality.stress()) {
             // If our previous desires contain too few of our favorites, then
             // add one in.
             let any_favs = self.desired.ingredients.iter().any(|x| {
@@ -752,7 +754,7 @@ impl Order {
         let next_ingr = self.desired.ingredients.get(next_idx);
         next_ingr.map(|next_ingr| {
             // Maybe ask if they have the ingredient we want.
-            if rng.gen_bool(personality.shyness) {
+            if rng.gen_bool(personality.shyness / personality.stress()) {
                 return Box::new(CheckFor(next_ingr.clone())) as Box<dyn Operation>;
             }
 

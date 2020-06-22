@@ -9,17 +9,18 @@ use crate::{
 use itertools::Itertools;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs::File};
+use std::{collections::HashMap, fs::File, time::Duration, time::Instant};
 
 type Inventory = HashMap<String, usize>;
 
 #[derive(Default)]
 pub struct Language {
     // Weights for grammar rules!
-    pub adverbs: u32,
-    pub adposition: u32,
-    pub conjunction: u32,
-    pub numbers: u32,
+    pub adverbs: i32,
+    pub adverb_side: i32,
+    pub adposition: i32,
+    pub conjunction: i32,
+    pub numbers: i32,
 }
 impl std::ops::Add for Language {
     type Output = Self;
@@ -29,6 +30,31 @@ impl std::ops::Add for Language {
             adposition: self.adposition + rhs.adposition,
             conjunction: self.conjunction + rhs.conjunction,
             numbers: self.numbers + rhs.numbers,
+            adverb_side: self.adverb_side + rhs.adverb_side,
+        }
+    }
+}
+
+pub enum Event {
+    LunchRush(Instant),
+}
+impl Event {
+    pub fn duration(&self) -> Duration {
+        use Event::*;
+        match self {
+            // Lunch rush lasts an hour.
+            LunchRush(_) => Duration::from_secs(3600),
+        }
+    }
+    pub fn stress(&self) -> f64 {
+        use Event::*;
+        match self {
+            LunchRush(_) => 2.0,
+        }
+    }
+    pub fn is_over(&self) -> bool {
+        match self {
+            Event::LunchRush(started) => Instant::now().duration_since(*started) > self.duration(),
         }
     }
 }
@@ -58,8 +84,10 @@ pub struct Personality {
     pub numbers: f64,
     /// Maps ingredient names to their inventory count.
     pub inventory: Inventory,
-    #[serde(default)]
+    pub history: Vec<Sandwich>,
     pub cloud: MeaningCloud,
+    #[serde(skip)]
+    pub event: Option<Event>,
     #[serde(skip, default = "Dictionary::new")]
     pub dictionary: Dictionary,
     #[serde(skip, default = "setup_display")]
@@ -99,7 +127,13 @@ impl Personality {
             inventory: Self::default_inventory(&dictionary),
             dictionary,
             last_lex: None,
+            history: Vec::new(),
+            event: None,
         }
+    }
+
+    pub fn stress(&self) -> f64 {
+        self.event.as_ref().map(|e| e.stress()).unwrap_or(1.0)
     }
 
     fn default_inventory(dict: &Dictionary) -> Inventory {
@@ -216,7 +250,7 @@ impl Personality {
         // Preferences and allergies could override each other applying to the
         // same ingredient.
         for fav in &self.preferences {
-            if rng.gen_bool(fav.severity) {
+            if rng.gen_bool(fav.severity * self.stress()) {
                 ingredients.push(fav.ingredient.clone());
                 len -= 1;
             }
@@ -234,6 +268,13 @@ impl Personality {
             complete: true,
             background_color: BG_COLORS.choose(&mut rng).unwrap().to_string(),
         }
+    }
+
+    /// Keep just ten of our last sandwiches in a stack.
+    /// We might use those memories later to shape our choices.
+    pub fn eat(&mut self, sandwich: Sandwich) {
+        self.history.insert(0, sandwich);
+        self.history.truncate(10);
     }
 }
 

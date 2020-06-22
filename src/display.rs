@@ -1,11 +1,11 @@
-use crate::behavior::Personality;
+use crate::behavior::{personality, Personality};
 use crate::sandwich::Ingredient;
 use async_std::task;
 use piston_window::*;
 use rand::prelude::*;
 use std::collections::HashMap;
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
-use std::thread;
+use std::{thread, time::Instant};
 
 #[derive(Debug, Default)]
 pub struct Render {
@@ -125,6 +125,17 @@ pub fn setup_display<'a>() -> Display {
                             Button::Keyboard(Key::A) => {
                                 action_sx
                                     .send(|personality| personality.increase_preference("avocado"));
+                            }
+                            Button::Keyboard(Key::E) => {
+                                action_sx.send(|p| p.increase_preference("fried-egg"));
+                            }
+                            Button::Keyboard(Key::S) => {
+                                action_sx.send(|p| p.spite += 0.1);
+                            }
+                            Button::Keyboard(Key::R) => {
+                                action_sx.send(|p| {
+                                    p.event = Some(personality::Event::LunchRush(Instant::now()))
+                                });
                             }
                             _ => {}
                         }

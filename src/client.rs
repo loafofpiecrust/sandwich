@@ -34,7 +34,6 @@ pub struct Client {
     /// We'll have a few words with default parts of speech if totally ambiguous.
     pub state: Box<dyn State>,
     behaviors: Vec<Box<dyn Behavior>>,
-    pub sandwich: Option<Sandwich>,
     pub lang: Personality,
     // encoder: Box<dyn Encoder>,
     last_result: Sandwich,
@@ -44,7 +43,6 @@ impl Client {
         Self {
             state: Box::new(Idle),
             behaviors: Vec::new(),
-            sandwich: None,
             // Make a new personality if there's none saved.
             lang: Personality::load().unwrap_or_else(|_| Personality::new()),
             // encoder: Box::new(RelativeEncoder::new(0.8, DesireEncoder)),
@@ -95,16 +93,17 @@ impl Client {
         let (msg_sx, mut msg_rx) = channel(1);
         let recv_task = task::spawn(Self::receives_msgs(stream.clone(), msg_sx));
         loop {
-            // Wait some time between each of our requests.
-            // TODO Some machines may wait for responses before sending the
-            // next operation. Or start waiting if there's a buffer of
-            // messages that haven't been acknowledged.
-            // TODO Change wait time based on shyness/politeness
-            let wait_time = Duration::from_millis(rng.gen_range(
-                300 * (self.lang.shyness * 10.0) as u64,
-                1000 * (self.lang.politeness * 10.0) as u64,
-            ));
-            while let Ok(action) = self.lang.display.actions.recv_timeout(wait_time) {
+            // Stress modifier multiplies value intesities, shortens wait times, etc.
+            let stress = self.lang.stress();
+
+            // End any finished events.
+            if let Some(evt) = self.lang.event.as_ref() {
+                if evt.is_over() {
+                    self.lang.event = None;
+                }
+            }
+
+            while let Ok(action) = self.lang.display.actions.try_recv() {
                 action(&mut self.lang);
             }
 
@@ -117,7 +116,15 @@ impl Client {
             // politeness extending the timeout makes real world sense, rather
             // than a polite machine waiting for seconds even after the request
             // is fulfilled.
-            if let Ok(Some(msg)) = msg_rx.try_next() {
+            // Wait some time between each of our requests.
+            // TODO Some machines may wait for responses before sending the
+            // next operation. Or start waiting if there's a buffer of
+            // messages that haven't been acknowledged.
+            let wait_time = Duration::from_millis(rng.gen_range(
+                (300.0 * self.lang.shyness * 10.0) as u64,
+                (1000.0 * self.lang.politeness * 10.0 / stress) as u64,
+            ));
+            if let Ok(Some(msg)) = timeout(wait_time, msg_rx.next()).await {
                 println!("received {:?}", msg);
                 if let Some(sandwich) = msg.sandwich {
                     self.last_result = sandwich;
@@ -154,8 +161,8 @@ impl Client {
 
             if let Some(mut op) = op {
                 // Request two operations at once if planned and not shy.
-                if rng.gen_bool(self.lang.planned)
-                    && !rng.gen_bool(self.lang.shyness)
+                if rng.gen_bool(self.lang.planned * stress)
+                    && !rng.gen_bool(self.lang.shyness / stress)
                     && rng.gen_bool(self.lang.conjunction)
                 {
                     let assumed_sandwich = op.apply(self.last_result.clone(), &mut self.lang);
@@ -175,6 +182,8 @@ impl Client {
         }
         // Say thank you and goodbye.
         self.say_and_send(&mut stream, &ops::Finish, None).await?;
+        // Now eat the sandwich, and save in our history.
+        self.lang.eat(self.last_result.clone());
         Ok(())
     }
 
@@ -226,10 +235,20 @@ impl Client {
             background: Some(color),
         })?;
 
-        let mut persistent_ops = Vec::<Box<dyn Operation>>::new();
+        let mut order = Order::new(&self.lang);
         self.last_result = Sandwich::default();
         // Only break the loop when the order is complete.
         while !self.last_result.complete {
+            // Stress modifier multiplies value intesities, shortens wait times, etc.
+            let stress = self.lang.stress();
+
+            // End any finished events.
+            if let Some(evt) = self.lang.event.as_ref() {
+                if evt.is_over() {
+                    self.lang.event = None;
+                }
+            }
+
             // If there's been user interaction, make sure to apply the results.
             while let Ok(action) = self.lang.display.actions.try_recv() {
                 action(&mut self.lang);
@@ -248,12 +267,12 @@ impl Client {
             }) = self.parse(&msg.text.unwrap())
             {
                 // Apply all persistent operations at every turn.
-                for passive_op in &persistent_ops {
+                for passive_op in &order.persistent_ops {
                     self.last_result = passive_op.apply(self.last_result.clone(), &mut self.lang);
                 }
 
                 // If spite is high enough, do the opposite of their order.
-                if rng.gen_bool(self.lang.spite) {
+                if rng.gen_bool(self.lang.spite * stress) {
                     op = op.reverse();
                     // Feel the release of anger calm you.
                     self.lang.spite = 0.0;
@@ -279,7 +298,7 @@ impl Client {
                 }
 
                 if op.is_persistent() {
-                    persistent_ops.push(op);
+                    order.persistent_ops.push(op);
                 }
 
                 // Save the lex of this phrase for one turn.
