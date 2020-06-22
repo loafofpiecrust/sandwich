@@ -70,6 +70,7 @@ pub fn setup_display<'a>() -> Display {
                                 texture_map
                                     .entry(x.name.clone())
                                     .or_insert_with(|| {
+                                        println!("{}", x.name);
                                         Texture::from_path(
                                             &mut tc,
                                             &format!("images/{}.png", x.name),
@@ -78,7 +79,7 @@ pub fn setup_display<'a>() -> Display {
                                                 .compress(true)
                                                 .filter(Filter::Nearest),
                                         )
-                                        .unwrap()
+                                        .expect("Failed to open ingredient image")
                                     })
                                     .clone()
                             })
