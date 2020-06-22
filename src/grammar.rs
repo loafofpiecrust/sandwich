@@ -725,7 +725,7 @@ pub struct FullParse {
 pub fn prob_sentence_new(input: &[u8], lang: &Personality) -> Option<FullParse> {
     if let Ok((_, words)) = phrase(input) {
         // Generate possible annotations until we find a successful parse.
-        for _ in 0..100 {
+        for _ in 0..200 {
             let tagged = prob_annotate(&words, lang);
             if let Ok((_, res)) = sentence(&tagged, lang) {
                 return Some(FullParse {
