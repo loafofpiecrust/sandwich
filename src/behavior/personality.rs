@@ -222,7 +222,7 @@ impl Personality {
             .iter_mut()
             .find(|x| &x.ingredient.name == name)
         {
-            pref.severity += 0.1;
+            Self::upgrade_skill(&mut pref.severity);
         }
         // Otherwise, add a new preference with the base severity.
         self.preferences.push(Preference {
@@ -250,7 +250,7 @@ impl Personality {
         // Preferences and allergies could override each other applying to the
         // same ingredient.
         for fav in &self.preferences {
-            if rng.gen_bool(fav.severity * self.stress()) {
+            if rng.gen_bool((fav.severity * self.stress()).min(1.0)) {
                 ingredients.push(fav.ingredient.clone());
                 len -= 1;
             }
