@@ -1,20 +1,14 @@
 use crate::{
     audio,
-    behavior::{
-        ops, Behavior, DesireEncoder, Encoder, Message, Operation, Order, Personality,
-        RelativeEncoder,
-    },
+    behavior::{ops, Behavior, Encoder, Message, Operation, Order, Personality},
     comm,
-    display::{setup_display, Render, RenderSender},
+    display::Render,
     grammar,
-    grammar::AnnotatedPhrase,
     grammar::FullParse,
-    grammar::WordFunction,
     sandwich::Sandwich,
     state::{Idle, OrderingSandwich, State},
 };
 use async_std::future::timeout;
-use async_std::io::BufReader;
 use async_std::net::TcpStream;
 use async_std::prelude::*;
 use async_std::sync::{Arc, RwLock};

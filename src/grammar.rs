@@ -416,18 +416,16 @@ fn adv_p<'a>(
         map(
             pair(|i| word_with_role(i, WordRole::Adverb), |i| adv_p(i, lang)),
             |(adv, (vp, vp_l))| {
-                let op = if thread_rng().gen_bool(lang.adverbs) {
-                    match adv.definition() {
-                        Some(WordFunction::Ever) => {
-                            Box::new(ops::Persist(vp)) as Box<dyn Operation>
-                        }
-                        Some(WordFunction::Negation) => vp.reverse(),
-                        Some(WordFunction::Question) => vp.question(),
-                        _ => todo!(),
-                    }
-                } else {
-                    vp
+                // let op = if thread_rng().gen_bool(lang.adverbs) {
+                let op = match adv.definition() {
+                    Some(WordFunction::Ever) => Box::new(ops::Persist(vp)) as Box<dyn Operation>,
+                    Some(WordFunction::Negation) => vp.reverse(),
+                    Some(WordFunction::Question) => vp.question(),
+                    _ => todo!(),
                 };
+                // } else {
+                //     vp
+                // };
                 (
                     op,
                     Language {
@@ -475,11 +473,10 @@ fn numbered_p<'a>(
     alt((
         map(pair(number, |i| numbered_p(i, lang)), |(n, (vp, l))| {
             (
-                if thread_rng().gen_bool(lang.numbers) {
-                    Box::new(ops::Repeat(n, vp)) as Box<dyn Operation>
-                } else {
-                    vp
-                },
+                // if thread_rng().gen_bool(lang.numbers) {
+                Box::new(ops::Repeat(n, vp)) as Box<dyn Operation>, // } else {
+                //     vp
+                // }
                 Language {
                     numbers: l.numbers + 1,
                     ..l
@@ -495,17 +492,17 @@ fn pos_p<'a>(
     input: &'a [AnnotatedWord],
     lang: &Personality,
 ) -> IResult<&'a [AnnotatedWord], Parsed> {
-    if thread_rng().gen_bool(lang.adposition) {
-        alt((
-            |i| adposition(i, lang).and_then(|(i, r)| clause_new(i, &r, lang)),
-            |i| clause_new(i, &ops::Relative::Top, lang),
-        ))(input)
-    } else {
-        // Skip over the adposition if we don't understand it.
-        preceded(opt(|i| adposition(i, lang)), |i| {
-            clause_new(i, &ops::Relative::Top, lang)
-        })(input)
-    }
+    // if thread_rng().gen_bool(lang.adposition) {
+    alt((
+        |i| adposition(i, lang).and_then(|(i, r)| clause_new(i, &r, lang)),
+        |i| clause_new(i, &ops::Relative::Top, lang),
+    ))(input)
+    // } else {
+    //     // Skip over the adposition if we don't understand it.
+    //     preceded(opt(|i| adposition(i, lang)), |i| {
+    //         clause_new(i, &ops::Relative::Top, lang)
+    //     })(input)
+    // }
 }
 
 fn greeting<'a>(input: &'a [AnnotatedWord]) -> IResult<&'a [AnnotatedWord], Parsed> {
@@ -584,11 +581,11 @@ fn conjuncted_phrase<'a>(
                 |i| conjuncted_phrase(i, lang),
             ),
             |((a, a_l), (b, b_l))| {
-                let op = if thread_rng().gen_bool(lang.conjunction) {
-                    Box::new(ops::Compound(a, b)) as Box<dyn Operation>
-                } else {
-                    b
-                };
+                // let op = if thread_rng().gen_bool(lang.conjunction) {
+                let op = Box::new(ops::Compound(a, b)) as Box<dyn Operation>;
+                // } else {
+                //     b
+                // };
                 (
                     op,
                     a_l + b_l
