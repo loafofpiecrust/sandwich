@@ -230,19 +230,28 @@ pub fn annotate(phrase: Phrase, context: &Personality) -> AnnotatedPhrase {
     result
 }
 
-pub fn sentence_new(input: &[u8], lang: &Personality) -> Option<Parsed> {
+pub fn sentence_new(input: &[u8], lang: &Personality) -> Option<FullParse> {
     phrase(input).ok().and_then(|(_, parsed)| {
         let tagged = annotate(parsed, lang);
         if let Ok((_, op)) = sentence(&tagged, lang) {
-            Some(op)
+            Some(FullParse {
+                operation: op.0,
+                lex: tagged,
+                lang: op.1,
+            })
         } else {
             // Try again with unknown words removed.
             let nt = tagged
+                .clone()
                 .into_iter()
                 .filter(|x| x.entry.as_ref().map(|x| x.role).is_some() || x.entry.is_some())
                 .collect_vec();
-            let c = sentence(&nt, lang);
-            c.ok().map(|(_, t)| t)
+            let c = sentence(&*nt, lang);
+            c.ok().map(|(_, t)| FullParse {
+                operation: t.0,
+                lang: t.1,
+                lex: tagged,
+            })
         }
     })
 }
@@ -422,16 +431,18 @@ fn adv_p<'a>(
         map(
             pair(|i| word_with_role(i, WordRole::Adverb), |i| adv_p(i, lang)),
             |(adv, (vp, vp_l))| {
-                // let op = if thread_rng().gen_bool(lang.adverbs) {
-                let op = match adv.definition() {
-                    Some(WordFunction::Ever) => Box::new(ops::Persist(vp)) as Box<dyn Operation>,
-                    Some(WordFunction::Negation) => vp.reverse(),
-                    Some(WordFunction::Question) => vp.question(),
-                    _ => todo!(),
+                let op = if thread_rng().gen_bool(lang.adverbs) {
+                    match adv.definition() {
+                        Some(WordFunction::Ever) => {
+                            Box::new(ops::Persist(vp)) as Box<dyn Operation>
+                        }
+                        Some(WordFunction::Negation) => vp.reverse(),
+                        Some(WordFunction::Question) => vp.question(),
+                        _ => todo!(),
+                    }
+                } else {
+                    vp
                 };
-                // } else {
-                //     vp
-                // };
                 (
                     op,
                     Language {
@@ -479,10 +490,11 @@ fn numbered_p<'a>(
     alt((
         map(pair(number, |i| numbered_p(i, lang)), |(n, (vp, l))| {
             (
-                // if thread_rng().gen_bool(lang.numbers) {
-                Box::new(ops::Repeat(n, vp)) as Box<dyn Operation>, // } else {
-                //     vp
-                // }
+                if thread_rng().gen_bool(lang.numbers) {
+                    Box::new(ops::Repeat(n, vp)) as Box<dyn Operation>
+                } else {
+                    vp
+                },
                 Language {
                     numbers: l.numbers + 1,
                     ..l
@@ -498,17 +510,17 @@ fn pos_p<'a>(
     input: &'a [AnnotatedWord],
     lang: &Personality,
 ) -> IResult<&'a [AnnotatedWord], Parsed> {
-    // if thread_rng().gen_bool(lang.adposition) {
-    alt((
-        |i| adposition(i, lang).and_then(|(i, r)| clause_new(i, &r, lang)),
-        |i| clause_new(i, &ops::Relative::Top, lang),
-    ))(input)
-    // } else {
-    //     // Skip over the adposition if we don't understand it.
-    //     preceded(opt(|i| adposition(i, lang)), |i| {
-    //         clause_new(i, &ops::Relative::Top, lang)
-    //     })(input)
-    // }
+    if thread_rng().gen_bool(lang.adposition) {
+        alt((
+            |i| adposition(i, lang).and_then(|(i, r)| clause_new(i, &r, lang)),
+            |i| clause_new(i, &ops::Relative::Top, lang),
+        ))(input)
+    } else {
+        // Skip over the adposition if we don't understand it.
+        preceded(opt(|i| adposition(i, lang)), |i| {
+            clause_new(i, &ops::Relative::Top, lang)
+        })(input)
+    }
 }
 
 fn greeting<'a>(input: &'a [AnnotatedWord]) -> IResult<&'a [AnnotatedWord], Parsed> {
@@ -587,11 +599,11 @@ fn conjuncted_phrase<'a>(
                 |i| conjuncted_phrase(i, lang),
             ),
             |((a, a_l), (b, b_l))| {
-                // let op = if thread_rng().gen_bool(lang.conjunction) {
-                let op = Box::new(ops::Compound(a, b)) as Box<dyn Operation>;
-                // } else {
-                //     b
-                // };
+                let op = if thread_rng().gen_bool(lang.conjunction) {
+                    Box::new(ops::Compound(a, b)) as Box<dyn Operation>
+                } else {
+                    b
+                };
                 (
                     op,
                     a_l + b_l
@@ -610,115 +622,6 @@ fn conjuncted_phrase<'a>(
 pub type Weights<T> = Vec<(T, u32)>;
 pub type POSCloud<'a> = HashMap<String, Weights<WordRole>>;
 pub type MeaningCloud = HashMap<String, Weights<DictionaryEntry>>;
-
-fn prob_word_with_def<'a>(
-    input: &'a [&'a str],
-    def: WordFunction,
-    lang: &Personality,
-) -> IResult<&'a [&'a str], AnnotatedWord> {
-    if let Some(d) = input.get(0) {
-        let possibilities = lang.get_cloud_entry(d);
-        let weights = possibilities.iter().map(|(_, p)| p);
-        let dist = WeightedIndex::new(weights).unwrap();
-        // Pick a dictionary entry for this one.
-        let choice = &possibilities[dist.sample(&mut thread_rng())];
-        if choice.0.function == def {
-            return Ok((
-                &input[1..],
-                AnnotatedWord {
-                    word: word(d.as_bytes()).unwrap().1,
-                    // role: Some(choice.0.role.clone()),
-                    entry: Some(choice.0.clone()),
-                },
-            ));
-        }
-    }
-    Err(nom::Err::Error((input, nom::error::ErrorKind::IsA)))
-}
-
-fn prob_word_with_role<'a>(
-    input: &'a [&'a str],
-    def: WordRole,
-    cloud: &MeaningCloud,
-) -> IResult<&'a [&'a str], AnnotatedWord> {
-    if let Some(d) = input.get(0) {
-        let possibilities = cloud.get(*d).unwrap();
-        let weights = possibilities.iter().map(|(_, p)| p);
-        let dist = WeightedIndex::new(weights).unwrap();
-        // Pick a dictionary entry for this one.
-        let choice = &possibilities[dist.sample(&mut thread_rng())];
-        if choice.0.role == def {
-            return Ok((
-                &input[1..],
-                AnnotatedWord {
-                    word: word(d.as_bytes()).unwrap().1,
-                    // role: Some(choice.0.role.clone()),
-                    entry: Some(choice.0.clone()),
-                },
-            ));
-        }
-    }
-    Err(nom::Err::Error((input, nom::error::ErrorKind::IsA)))
-}
-
-fn prob_ingredient<'a>(
-    input: &'a [&'a str],
-    lang: &Personality,
-) -> IResult<&'a [&'a str], Ingredient> {
-    map(
-        |i| prob_word_with_role(i, WordRole::Noun, &lang.cloud),
-        |w| lang.dictionary.ingredients.from_word(&w.word).clone(),
-    )(input)
-}
-fn prob_adposition<'a>(
-    input: &'a [&'a str],
-    lang: &Personality,
-) -> IResult<&'a [&'a str], ops::Relative> {
-    map(
-        pair(
-            |i| prob_ingredient(i, lang),
-            |i| prob_word_with_role(i, WordRole::Preposition, &lang.cloud),
-        ),
-        |(ingr, pos)| ops::Relative::from_def(pos.entry.as_ref().unwrap().function, ingr),
-    )(input)
-}
-fn prob_pos_p<'a>(input: &'a [&'a str], lang: &Personality) -> IResult<&'a [&'a str], Parsed> {
-    // NOTE Assumes for now that we know what adpositions are, not assigning
-    // probability to this rule itself, just the words themselves.
-    alt((
-        |i| prob_adposition(i, lang).and_then(|(i, r)| prob_clause_new(i, &r, lang)),
-        |i| prob_clause_new(i, &ops::Relative::Top, lang),
-    ))(input)
-}
-
-/// VP -> (NP) V
-pub fn prob_clause_new<'a>(
-    input: &'a [&'a str],
-    pos: &ops::Relative,
-    lang: &Personality,
-) -> IResult<&'a [&'a str], Parsed> {
-    map(
-        pair(
-            |i| prob_ingredient(i, lang),
-            |i| prob_word_with_role(i, WordRole::Verb, &lang.cloud),
-        ),
-        |(np, v)| match v.definition() {
-            Some(WordFunction::Desire) => (
-                Box::new(ops::Add(np, pos.clone())) as Box<dyn Operation>,
-                Language {
-                    adposition: if *pos == ops::Relative::Top { 0 } else { 1 },
-                    ..Default::default()
-                },
-            ),
-            Some(WordFunction::Have) => (
-                Box::new(ops::Ensure(np)) as Box<dyn Operation>,
-                Language::default(),
-            ),
-            _ => todo!("This verb hasn't been mapped to an operation yet."),
-        },
-    )(input)
-}
-
 pub struct FullParse {
     pub operation: Box<dyn Operation>,
     pub lang: Language,

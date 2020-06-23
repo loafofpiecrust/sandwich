@@ -21,7 +21,7 @@ use rand::prelude::*;
 use take_mut::take;
 // use futures::prelude::*;
 use futures::{pin_mut, select, FutureExt};
-use grammar::{prob_sentence_new, Dictionary, PhraseNode};
+use grammar::{sentence_new, Dictionary, PhraseNode};
 use std::{thread, time::Duration};
 
 pub struct Client {
@@ -362,7 +362,7 @@ impl Client {
         // (response, sandwich)
     }
     pub fn parse(&mut self, input: &str) -> Option<FullParse> {
-        prob_sentence_new(input.as_bytes(), &self.lang)
+        sentence_new(input.as_bytes(), &self.lang)
     }
     pub fn lex(&self, input: &str) -> Option<Vec<grammar::AnnotatedWord>> {
         grammar::phrase(input.as_bytes())
