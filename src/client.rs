@@ -18,7 +18,6 @@ use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::sink::SinkExt;
 use itertools::Itertools;
 use rand::prelude::*;
-use take_mut::take;
 // use futures::prelude::*;
 use futures::{pin_mut, select, FutureExt};
 use grammar::{sentence_new, Dictionary, PhraseNode};
@@ -114,9 +113,9 @@ impl Client {
             // TODO Some machines may wait for responses before sending the
             // next operation. Or start waiting if there's a buffer of
             // messages that haven't been acknowledged.
-            let min_wait = (500.0 * self.lang.shyness * 10.0) as u64;
+            let min_wait = (300.0 * self.lang.shyness * 10.0) as u64;
             let wait_time = Duration::from_millis(
-                rng.gen_range(100, (1000.0 * self.lang.politeness * 10.0 / stress) as u64),
+                rng.gen_range(100, (1200.0 * self.lang.politeness * 10.0 / stress) as u64),
             );
             task::sleep(Duration::from_millis(min_wait)).await;
             if let Ok(Some(msg)) = timeout(wait_time, msg_rx.next()).await {

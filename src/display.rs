@@ -124,8 +124,7 @@ pub fn setup_display<'a>() -> Display {
                     if k.state == ButtonState::Press {
                         match k.button {
                             Button::Keyboard(Key::A) => {
-                                action_sx
-                                    .send(|personality| personality.increase_preference("avocado"));
+                                action_sx.send(|p| p.increase_preference("avocado"));
                             }
                             Button::Keyboard(Key::E) => {
                                 action_sx.send(|p| p.increase_preference("fried-egg"));
