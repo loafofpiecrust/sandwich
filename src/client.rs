@@ -115,14 +115,13 @@ impl Client {
             // next operation. Or start waiting if there's a buffer of
             // messages that haven't been acknowledged.
             let min_wait = (500.0 * self.lang.shyness * 10.0) as u64;
-            let wait_time = Duration::from_millis(rng.gen_range(
-                100,
-                (1000.0 * (self.lang.politeness / stress) * 10.0) as u64,
-            ));
+            let wait_time = Duration::from_millis(
+                rng.gen_range(100, (1000.0 * self.lang.politeness * 10.0 / stress) as u64),
+            );
             task::sleep(Duration::from_millis(min_wait)).await;
             if let Ok(Some(msg)) = timeout(wait_time, msg_rx.next()).await {
-                println!("received {:?}", msg);
                 if let Some(sandwich) = msg.sandwich {
+                    println!("received {}", sandwich);
                     self.last_result = sandwich;
                 }
 
@@ -290,6 +289,7 @@ impl Client {
                 // this lex to update our word association weights.
                 // TODO Initial shared vocab should just be Yes + No i guess?
                 // TODO Check if `op` is an affirmation, in which case use last_lex!
+                println!("lexed {:?}", lex);
                 self.lang.last_lex = Some(lex);
             } else {
                 println!("Failed to parse phrase")

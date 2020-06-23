@@ -6,6 +6,7 @@ use rand::prelude::*;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use serde_yaml;
+use std::fmt::{self, Display};
 use std::fs::File;
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, Hash)]
@@ -139,6 +140,15 @@ impl Ingredient {
             }
         }
         None
+    }
+}
+impl Display for Sandwich {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "[")?;
+        for ingr in &self.ingredients {
+            write!(f, "{}, ", ingr.name)?;
+        }
+        write!(f, "]")
     }
 }
 

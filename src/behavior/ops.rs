@@ -664,6 +664,17 @@ impl Order {
 
         // TODO When considering a removal, maybe try to do a swap instead.
 
+        // There could be extra ingredients that we didn't ask for.
+        let extra = result
+            .ingredients
+            .iter()
+            .find(|x| !self.desired.ingredients.contains(x));
+        if let Some(extra) = extra {
+            if !rng.gen_bool(personality.shyness / personality.stress()) {
+                return Some(Box::new(Remove(extra.clone())));
+            }
+        }
+
         // There's a mistake if any preceding ingredients aren't in the result sandwich.
         // NOTE disregarding order for the moment.
         let mistake = self
