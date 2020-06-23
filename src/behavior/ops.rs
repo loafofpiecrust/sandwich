@@ -352,7 +352,7 @@ impl Operation for Ensure {
         None
     }
     fn question(&self) -> Box<dyn Operation> {
-        todo!()
+        Box::new(CheckFor(self.0.clone()))
     }
 }
 
