@@ -79,6 +79,7 @@ pub struct Personality {
     pub preferences: Vec<Preference>,
     // Weights for grammar rules!
     pub adverbs: f64,
+    pub adverb_side: f64,
     pub adposition: f64,
     pub conjunction: f64,
     pub numbers: f64,
@@ -121,6 +122,7 @@ impl Personality {
             cloud: Default::default(),
             // Grammar rule weights
             adverbs: 0.1,
+            adverb_side: 0.95,
             adposition: 0.1,
             conjunction: 0.1,
             numbers: 0.1,
@@ -193,23 +195,15 @@ impl Personality {
         deg(&mut self.numbers)
     }
     pub fn apply_upgrade(&mut self, lang: Language) {
-        // TODO Apply downgrades too?
-        for _ in 0..lang.adposition {
-            Self::upgrade_skill(&mut self.adposition)
-        }
-        for _ in 0..lang.numbers {
-            Self::upgrade_skill(&mut self.numbers)
-        }
-        for _ in 0..lang.adverbs {
-            Self::upgrade_skill(&mut self.adverbs)
-        }
-        for _ in 0..lang.conjunction {
-            Self::upgrade_skill(&mut self.conjunction)
-        }
+        Self::upgrade_skill(&mut self.adposition, lang.adposition as f64);
+        Self::upgrade_skill(&mut self.numbers, lang.numbers as f64);
+        Self::upgrade_skill(&mut self.adverbs, lang.adverbs as f64);
+        Self::upgrade_skill(&mut self.conjunction, lang.conjunction as f64);
+        Self::upgrade_skill(&mut self.adverb_side, lang.adverb_side as f64);
     }
-    pub fn upgrade_skill(x: &mut f64) {
+    pub fn upgrade_skill(x: &mut f64, mult: f64) {
         let orig = *x;
-        *x = (*x + ((*x * 100.0).ln()) / 100.0).min(1.0);
+        *x = (*x + ((*x * 100.0).ln()) / 100.0 * mult).min(1.0);
         println!("Upgraded language skill from {} => {}", orig, *x);
     }
     pub fn render(&self, state: Render) -> anyhow::Result<()> {
@@ -222,7 +216,7 @@ impl Personality {
             .iter_mut()
             .find(|x| &x.ingredient.name == name)
         {
-            Self::upgrade_skill(&mut pref.severity);
+            Self::upgrade_skill(&mut pref.severity, 1.0);
         }
         // Otherwise, add a new preference with the base severity.
         self.preferences.push(Preference {

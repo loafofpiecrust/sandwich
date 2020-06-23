@@ -427,33 +427,66 @@ fn adv_p<'a>(
     input: &'a [AnnotatedWord],
     lang: &Personality,
 ) -> IResult<&'a [AnnotatedWord], Parsed> {
-    alt((
-        map(
-            pair(|i| word_with_role(i, WordRole::Adverb), |i| adv_p(i, lang)),
-            |(adv, (vp, vp_l))| {
-                let op = if thread_rng().gen_bool(lang.adverbs) {
-                    match adv.definition() {
-                        Some(WordFunction::Ever) => {
-                            Box::new(ops::Persist(vp)) as Box<dyn Operation>
-                        }
-                        Some(WordFunction::Negation) => vp.reverse(),
-                        Some(WordFunction::Question) => vp.question(),
-                        _ => todo!(),
-                    }
-                } else {
-                    vp
-                };
-                (
-                    op,
-                    Language {
-                        adverbs: vp_l.adverbs + 1,
-                        ..vp_l
-                    },
-                )
+    let react = move |adv: &AnnotatedWord, (vp, vp_l): Parsed| {
+        let op = if thread_rng().gen_bool(lang.adverbs) {
+            match adv.definition() {
+                Some(WordFunction::Ever) => Box::new(ops::Persist(vp)) as Box<dyn Operation>,
+                Some(WordFunction::Negation) => vp.reverse(),
+                Some(WordFunction::Question) => vp.question(),
+                _ => todo!(),
+            }
+        } else {
+            vp
+        };
+        (
+            op,
+            Language {
+                adverbs: vp_l.adverbs + 1,
+                ..vp_l
             },
-        ),
+        )
+    };
+    let x = alt((
+        |i| {
+            // Pick a word order based on our language system.
+            // TODO Try to pull this out into a generic `ordered_pair` function?
+            if thread_rng().gen_bool(lang.adverb_side) {
+                map(
+                    pair(|i| word_with_role(i, WordRole::Adverb), |i| adv_p(i, lang)),
+                    |(adv, (vp, vp_l))| {
+                        react(
+                            adv,
+                            (
+                                vp,
+                                Language {
+                                    adverb_side: 1,
+                                    ..vp_l
+                                },
+                            ),
+                        )
+                    },
+                )(i)
+            } else {
+                map(
+                    pair(|i| adv_p(i, lang), |i| word_with_role(i, WordRole::Adverb)),
+                    |((vp, vp_l), adv)| {
+                        react(
+                            adv,
+                            (
+                                vp,
+                                Language {
+                                    adverb_side: -1,
+                                    ..vp_l
+                                },
+                            ),
+                        )
+                    },
+                )(i)
+            }
+        },
         |i| pos_p(i, lang),
-    ))(input)
+    ))(input);
+    x
 }
 
 fn adposition<'a>(
