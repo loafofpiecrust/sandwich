@@ -200,7 +200,10 @@ impl Operation for RemoveAll {
         Box::new(Ensure(self.0.clone()))
     }
     fn encode(&self, lang: &Personality) -> AnnotatedPhrase {
-        todo!()
+        let all = lang.dictionary.annotated_word_for_def(WordFunction::Ever);
+        let mut inner = Remove(self.0.clone()).encode(lang);
+        inner.insert(0, all);
+        inner
     }
     fn is_persistent(&self) -> bool {
         false
@@ -671,7 +674,13 @@ impl Order {
             .find(|x| !self.desired.ingredients.contains(x));
         if let Some(extra) = extra {
             if !rng.gen_bool(personality.shyness / personality.stress()) {
-                return Some(Box::new(Remove(extra.clone())));
+                // FIXME Not *exactly* what we want, but close.
+                let remover = Box::new(Remove(extra.clone()));
+                return Some(if rng.gen_bool(personality.adverbs) {
+                    Box::new(Persist(remover))
+                } else {
+                    remover
+                });
             }
         }
 
