@@ -375,7 +375,13 @@ fn ingredient<'a>(
 ) -> IResult<&'a [AnnotatedWord], Ingredient> {
     map(
         |i| word_with_def(i, WordFunction::Ingredient),
-        |w| lang.dictionary.ingredients.from_word(&w.word).clone(),
+        |w| {
+            lang.dictionary
+                .ingredients
+                .from_def(&w.entry.as_ref().unwrap().definition)
+                .unwrap()
+                .clone()
+        },
     )(input)
 }
 
