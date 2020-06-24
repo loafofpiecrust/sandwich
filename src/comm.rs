@@ -8,10 +8,11 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 const SANDWICH_PORT: u16 = 34222;
-const HOSTS: &[&str] = &["sandwich2", "loafofpiecrust"];
+const HOSTS: &[&str] = &["sandwich2", "sandwich3", "loafofpiecrust"];
 lazy_static! {
     pub static ref BG_COLORS: HashMap<&'static str, &'static str> = hashmap! {
         "sandwich2" => "ffbd33ff",
+        "sandwich3" => "00000000",
         "loafofpiecrust" => "ffffffff",
     };
 }
