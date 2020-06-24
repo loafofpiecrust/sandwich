@@ -238,7 +238,7 @@ impl Personality {
         let mut rng = thread_rng();
         let mut ingredients = Vec::new();
         // Make sandwich sizes more varied.
-        let len = rng.gen_range(len / 2, len * 2);
+        let mut len = rng.gen_range(len / 2, len * 2);
         // Pick a base first, then the inside ingredients.
         let (bottom, top) = self.dictionary.ingredients.random_base();
         ingredients.push(bottom.clone());
