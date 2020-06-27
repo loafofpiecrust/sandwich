@@ -9,18 +9,22 @@ use std::time::Duration;
 
 const SANDWICH_PORT: u16 = 34222;
 const HOSTS: &[&str] = &[
+    "sandwich1",
     "sandwich2",
     "sandwich3",
     "sandwich4",
     "sandwich5",
+    "sandwich6",
     "loafofpiecrust",
 ];
 lazy_static! {
     pub static ref BG_COLORS: HashMap<&'static str, &'static str> = hashmap! {
+        "sandwich1" => "00000000",
         "sandwich2" => "ffbd33ff",
         "sandwich3" => "00000000",
         "sandwich4" => "00000000",
         "sandwich5" => "00000000",
+        "sandwich6" => "00000000",
         "loafofpiecrust" => "ffffffff",
     };
 }
