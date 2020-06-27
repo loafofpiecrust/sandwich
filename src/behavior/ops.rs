@@ -696,7 +696,7 @@ impl Order {
         // If we aren't shy, try to correct a mistake!
         if mistake.is_some()
             && !rng.gen_bool(personality.shyness / personality.stress())
-            && rng.gen_bool(personality.adposition * 2.0)
+            && rng.gen_bool((personality.adposition * 1.5).min(0.99))
         {
             let idx = mistake.unwrap();
             // Pick a preposition to position the missing ingredient where we'd like it.
@@ -741,7 +741,7 @@ impl Order {
             // ingredient to be removed.
             if rng.gen_bool(allergen.severity)
                 && !rng.gen_bool(personality.shyness / personality.stress())
-                && rng.gen_bool(personality.adverbs * 2.0)
+                && rng.gen_bool((personality.adverbs * 1.5).min(0.99))
             {
                 return Some(Box::new(Remove(allergen.ingredient.clone())));
             }
@@ -791,7 +791,7 @@ impl Order {
                 .skip(next_idx) // If we want index 1, skip just the zeroth.
                 .take_while(|x| x == &next_ingr)
                 .count();
-            if same_count > 1 && rng.gen_bool(personality.numbers * 2.0) {
+            if same_count > 1 && rng.gen_bool(personality.numbers) {
                 Box::new(Repeat(same_count as u32, adder)) as Box<dyn Operation>
             } else {
                 // Default behavior, just add the next ingredient to the top of the sandwich.
@@ -815,7 +815,10 @@ impl Message {
     const MAX_SIZE: usize = 4096;
     pub async fn recv(stream: &mut TcpStream) -> anyhow::Result<Self> {
         let mut buf = [0u8; Self::MAX_SIZE];
+        // Always read the same packet size.
+        // TODO Just read until valid json is complete?
         stream.read_exact(&mut buf).await?;
+        // Trim trailing zeroes for json parsing.
         let last_valid = buf.iter().rposition(|b| *b != 0).unwrap();
         Ok(serde_json::from_slice(&buf[0..=last_valid])?)
     }

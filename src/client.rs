@@ -261,7 +261,7 @@ impl Client {
                 }
 
                 // If spite is high enough, do the opposite of their order.
-                if rng.gen_bool((self.lang.spite * stress).min(1.0)) {
+                if rng.gen_bool((self.lang.spite * stress).min(0.99)) {
                     op = op.reverse();
                     // Feel the release of anger calm you.
                     self.lang.spite = 0.0;
