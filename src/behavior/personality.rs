@@ -83,6 +83,7 @@ pub struct Personality {
     pub adposition: f64,
     pub conjunction: f64,
     pub numbers: f64,
+    pub pitch_shift: f64,
     /// Maps ingredient names to their inventory count.
     pub inventory: Inventory,
     pub history: Vec<Sandwich>,
@@ -126,6 +127,7 @@ impl Personality {
             adposition: 0.1,
             conjunction: 0.1,
             numbers: 0.1,
+            pitch_shift: thread_rng().gen_range(0.5, 2.0),
             inventory: Self::default_inventory(&dictionary),
             dictionary,
             last_lex: None,

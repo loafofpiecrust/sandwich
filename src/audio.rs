@@ -26,19 +26,26 @@ pub fn play_sound(frequencies: (u32, u32), duration: Duration) -> anyhow::Result
     Ok(())
 }
 
-pub fn play_phrase(phrase: &str) -> anyhow::Result<()> {
+pub fn play_phrase(phrase: &str, shift: f64) -> anyhow::Result<()> {
     for w in phrase.split(" ") {
-        play_word(w)?;
+        play_word(w, shift)?;
         // crate::wait_randomly(100);
     }
     Ok(())
 }
 
+fn mult_freq(f: u32, shift: f64) -> u32 {
+    (f as f64 * shift) as u32
+}
+
 /// Assumes strict CV syllable structure for now.
-pub fn play_word(word: &str) -> anyhow::Result<()> {
+pub fn play_word(word: &str, shift: f64) -> anyhow::Result<()> {
     for (a, b) in word.chars().tuples() {
         play_sound(
-            (consonant_sound(a), vowel_sound(b)),
+            (
+                mult_freq(consonant_sound(a), shift),
+                mult_freq(vowel_sound(b), shift),
+            ),
             Duration::from_millis(200),
         )?;
     }

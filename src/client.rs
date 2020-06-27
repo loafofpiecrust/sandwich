@@ -352,7 +352,7 @@ impl Client {
         })?;
 
         // Play the phrase out loud.
-        audio::play_phrase(phrase)?;
+        audio::play_phrase(phrase, self.lang.pitch_shift)?;
 
         // Send the other our words.
         // let mut str_buf = [0; 512];
