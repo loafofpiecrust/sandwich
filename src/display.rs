@@ -98,7 +98,7 @@ pub fn setup_display<'a>() -> Display {
                     clear(background, g);
 
                     // Render the subtitles.
-                    let sub_t = c.transform.trans(200.0, 800.0);
+                    let sub_t = c.transform.trans(200.0, 900.0);
                     text([1.0, 1.0, 1.0, 1.0], 40, &subtitles, &mut font, sub_t, g).unwrap();
                     // Push all text to the screen.
                     font.factory.encoder.flush(d);
