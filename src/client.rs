@@ -43,16 +43,21 @@ impl Client {
     }
 
     pub async fn connect_with_peer(&mut self) -> anyhow::Result<()> {
+        let mut rng = thread_rng();
         // Keep doing sandwich interactions forever.
+        // Rotate between trying to be a customer and trying to be a server.
+
         loop {
-            let client = comm::find_peer().fuse();
-            let server = comm::wait_for_peer().fuse();
-            pin_mut!(client, server);
-            let r = select! {
-                s = client => self.new_customer(s.0?, s.1).await,
-                s = server => self.new_server(s.0?, s.1).await,
-            };
-            dbg!(r);
+            let dur = Duration::from_millis(rng.gen_range(1000, 3000));
+            if rng.gen_bool(0.5) {
+                if let Ok(c) = timeout(dur, comm::find_peer()).await {
+                    dbg!(self.new_customer(c.0?, c.1).await);
+                }
+            } else {
+                if let Ok(c) = timeout(dur, comm::wait_for_peer()).await {
+                    dbg!(self.new_server(c.0?, c.1).await);
+                }
+            }
         }
     }
 
