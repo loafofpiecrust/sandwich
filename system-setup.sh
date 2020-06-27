@@ -19,6 +19,9 @@ amixer cset numid=3 2
 # Hide the mouse cursor entirely.
 sudo sed -i "s/#xserver-command=X/xserver-command=X -nocursor/g" /etc/lightdm/lightdm.conf
 
+# Disable screen blanking when idle
+printf "@xset s noblank\n@xset s off\n@xset s -dpms\n" | sudo tee -a /etc/xdg/lxsession/LXDE-pi/autostart
+
 # Advertise this machine to the local network.
 sudo apt-get install avahi-daemon
 
