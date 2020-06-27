@@ -99,7 +99,7 @@ pub fn setup_display<'a>() -> Display {
 
                     // Render the subtitles.
                     let sub_t = c.transform.trans(200.0, 800.0);
-                    text([1.0, 1.0, 1.0, 1.0], 30, &subtitles, &mut font, sub_t, g).unwrap();
+                    text([1.0, 1.0, 1.0, 1.0], 40, &subtitles, &mut font, sub_t, g).unwrap();
                     // Push all text to the screen.
                     font.factory.encoder.flush(d);
 
@@ -112,7 +112,7 @@ pub fn setup_display<'a>() -> Display {
                         };
                         let transform = c
                             .transform
-                            .trans(500.0, 600.0 - offset * idx as f64)
+                            .trans(960.0, 600.0 - offset * idx as f64)
                             .rot_deg(rot)
                             .scale(scale, scale)
                             // Anchor elements at theit center point.
