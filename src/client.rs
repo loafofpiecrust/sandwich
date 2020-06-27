@@ -246,6 +246,7 @@ impl Client {
             // If there are zeroes, we might parse as a (None, None) accidentally.
             // So let's check for that.
             if msg.text.is_none() && msg.sandwich.is_none() {
+                println!("Received a completely empty message");
                 break;
             }
 
