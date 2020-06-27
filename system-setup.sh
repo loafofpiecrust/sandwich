@@ -10,7 +10,14 @@ sudo touch /boot/ssh
 echo "$1" | sudo tee /etc/hostname
 sudo sed -i "s/raspberrypi/$1/g" /etc/hosts
 
-echo "hdmi_mode=82" | sudo tee -a /boot/config.txt
+# Set the output to HDMI, 1080p
+sudo sed -i "s/#hdmi_mode=1/hdmi_mode=82/g" /boot/config.txt
+sudo sed -i "s/#hdmi_group=1/hdmi_group=2/g" /boot/config.txt
+# Set audio output to HDMI.
+amixer cset numid=3 2
+
+# Hide the mouse cursor entirely.
+sudo sed -i "s/#xserver-command=X/xserver-command=X -nocursor/g" /etc/lightdm/lightdm.conf
 
 # Advertise this machine to the local network.
 sudo apt-get install avahi-daemon
