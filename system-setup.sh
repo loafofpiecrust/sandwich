@@ -7,7 +7,7 @@
 sudo touch /boot/ssh
 
 # Set the hostname.
-echo "$1" | sudo tee -a /etc/hostname
+echo "$1" | sudo tee /etc/hostname
 sudo sed -i "s/raspberrypi/$1/g" /etc/hosts
 
 # Advertise this machine to the local network.
