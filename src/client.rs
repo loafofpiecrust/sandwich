@@ -48,6 +48,14 @@ impl Client {
         // Rotate between trying to be a customer and trying to be a server.
 
         loop {
+            // Clear the display.
+            self.lang.display.render.send(Render {
+                ingredients: Some(Vec::new()),
+                subtitles: Some(String::new()),
+                background: Some("ffffffff"),
+            })?;
+
+            // Either be a client or server.
             let dur = Duration::from_millis(rng.gen_range(1000, 3000));
             if rng.gen_bool(0.5) {
                 if let Ok(c) = timeout(dur, comm::find_peer()).await {
