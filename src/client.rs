@@ -243,6 +243,12 @@ impl Client {
             // TODO This machine might wait to receive multiple operations before applying them all at once.
             let msg = Message::recv(&mut stream).await?;
 
+            // If there are zeroes, we might parse as a (None, None) accidentally.
+            // So let's check for that.
+            if msg.text.is_none() && msg.sandwich.is_none() {
+                break;
+            }
+
             if let Some(FullParse {
                 operation: mut op,
                 lang: lang_change,
