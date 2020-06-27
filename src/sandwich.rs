@@ -18,7 +18,7 @@ pub struct Ingredient {
 impl Ingredient {
     pub fn all() -> Self {
         let file = File::open("ingredients.yml").unwrap();
-        serde_yaml::from_reader(file).expect("Failed to parse ingreidents file");
+        serde_yaml::from_reader(file).expect("Failed to parse ingreidents file")
     }
 
     pub fn name(&self) -> &str {
