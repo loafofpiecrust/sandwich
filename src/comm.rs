@@ -19,13 +19,13 @@ const HOSTS: &[&str] = &[
 ];
 lazy_static! {
     pub static ref BG_COLORS: HashMap<&'static str, &'static str> = hashmap! {
-        "sandwich1" => "00000000",
+        "sandwich1" => "44000dff",
         "sandwich2" => "ffbd33ff",
         "sandwich3" => "00000000",
-        "sandwich4" => "00000000",
-        "sandwich5" => "00000000",
+        "sandwich4" => "83142cff",
+        "sandwich5" => "99b898ff",
         "sandwich6" => "00000000",
-        "loafofpiecrust" => "ffffffff",
+        "loafofpiecrust" => "3ca59dff",
     };
 }
 
