@@ -815,7 +815,7 @@ impl Message {
     const MAX_SIZE: usize = 4096;
     pub async fn recv(stream: &mut TcpStream) -> anyhow::Result<Self> {
         let mut buf = [0u8; Self::MAX_SIZE];
-        stream.read(&mut buf).await?;
+        stream.read_exact(&mut buf).await?;
         Ok(serde_json::from_reader(&buf as &[u8])?)
     }
     pub async fn send(&self, stream: &mut TcpStream) -> anyhow::Result<()> {
