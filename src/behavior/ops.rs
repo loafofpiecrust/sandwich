@@ -31,6 +31,7 @@ use async_std::prelude::*;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
+use serde_json;
 
 /// An operation makes some change to a sandwich based on its internal structure
 /// and the [Personality] passed to it.
@@ -815,11 +816,11 @@ impl Message {
     pub async fn recv(stream: &mut TcpStream) -> anyhow::Result<Self> {
         let mut buf = [0u8; Self::MAX_SIZE];
         stream.read(&mut buf).await?;
-        Ok(bincode::deserialize_from(&buf as &[u8])?)
+        Ok(serde_json::from_reader(&buf as &[u8])?)
     }
     pub async fn send(&self, stream: &mut TcpStream) -> anyhow::Result<()> {
         let mut buf = [0u8; Self::MAX_SIZE];
-        bincode::serialize_into(&mut buf as &mut [u8], self)?;
+        serde_json::to_writer(&mut buf as &mut [u8], self)?;
         stream.write(&buf).await?;
         Ok(())
     }

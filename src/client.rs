@@ -13,7 +13,6 @@ use async_std::net::TcpStream;
 use async_std::prelude::*;
 use async_std::sync::{Arc, RwLock};
 use async_std::task;
-use bincode;
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::sink::SinkExt;
 use itertools::Itertools;
