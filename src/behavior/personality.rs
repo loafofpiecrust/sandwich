@@ -203,7 +203,7 @@ impl Personality {
     }
     pub fn upgrade_skill(x: &mut f64, mult: f64) {
         let orig = *x;
-        *x = (*x + (x.ln() / 10.0).abs() * mult).min(1.0);
+        *x = (*x + (x.ln() / 100.0).abs() * mult).min(1.0);
         println!("Upgraded language skill from {} => {}", orig, *x);
     }
     pub fn render(&self, state: Render) -> anyhow::Result<()> {
