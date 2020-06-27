@@ -8,7 +8,7 @@ use std::{thread, time::Duration};
 const VOLUME: f32 = 0.4;
 
 pub fn play_sound(frequencies: (u32, u32), duration: Duration) -> anyhow::Result<()> {
-    let device = rodio::default_output_device().unwrap();
+    let device = rodio::default_output_device().expect("Failed to setup audio output");
     let sink1 = Sink::new(&device);
     let sink2 = Sink::new(&device);
 

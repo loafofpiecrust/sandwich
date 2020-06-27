@@ -220,7 +220,12 @@ impl Personality {
         }
         // Otherwise, add a new preference with the base severity.
         self.preferences.push(Preference {
-            ingredient: self.dictionary.ingredients.from_def(name).unwrap().clone(),
+            ingredient: self
+                .dictionary
+                .ingredients
+                .from_def(name)
+                .expect("No ingredient by that name")
+                .clone(),
             severity: 0.1,
         });
     }

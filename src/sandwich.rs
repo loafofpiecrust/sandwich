@@ -18,7 +18,7 @@ pub struct Ingredient {
 impl Ingredient {
     pub fn all() -> Self {
         let file = File::open("ingredients.yml").unwrap();
-        serde_yaml::from_reader(file).unwrap()
+        serde_yaml::from_reader(file).expect("Failed to parse ingreidents file");
     }
 
     pub fn name(&self) -> &str {
@@ -40,7 +40,7 @@ impl Ingredient {
                 // Inner ingredients can't be a base.
                 .filter(|x| x.name != "base")
                 .choose(&mut thread_rng())
-                .unwrap()
+                .expect("Failed to find random child ingredient")
                 .random()
         } else {
             &self
@@ -59,7 +59,7 @@ impl Ingredient {
             // Grab all the children of the base, which should be [bottom, top].
             .and_then(|b| b.children.as_ref())
             .and_then(|c| c.iter().tuples().next())
-            .unwrap()
+            .expect("Failed to pick a random base")
     }
 
     /// All bottom-level ingredients that can be added to a sandwich.
@@ -123,7 +123,7 @@ impl Ingredient {
                 definition: ingredient.name.clone(),
             }),
         })
-        .unwrap()
+        .expect("Failed to find word for ingredient")
     }
 
     pub fn to_word(&self, ingredient: &Ingredient, word_so_far: String) -> Option<String> {

@@ -388,7 +388,7 @@ fn ingredient<'a>(
             lang.dictionary
                 .ingredients
                 .from_def(&w.entry.as_ref().unwrap().definition)
-                .unwrap()
+                .expect("No ingredient by that name")
                 .clone()
         },
     )(input)

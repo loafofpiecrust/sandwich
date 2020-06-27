@@ -97,7 +97,7 @@ impl State for MakingSandwich {
         let verb = input
             .main_verb()
             .and_then(|x| x.entry.clone())
-            .unwrap()
+            .expect("Failed to find main verb")
             .function;
         let (word, sammich) = match verb {
             WordFunction::Greeting => (WordFunction::Greeting, Some(self.sandwich.clone())),

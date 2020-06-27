@@ -29,12 +29,12 @@ pub fn setup_display<'a>() -> Display {
     task::spawn(async move {
         let window = std::panic::catch_unwind(|| {
             WindowSettings::new("SANDWICH", (1920, 1080))
-                // .fullscreen(true)
+                .fullscreen(true)
                 .automatic_close(true)
                 .exit_on_esc(true)
                 .vsync(true)
                 .build::<PistonWindow>()
-                .unwrap()
+                .expect("Failed to build window")
         });
         if let Ok(mut window) = window {
             let mut events = Events::new(EventSettings::new());
@@ -45,7 +45,9 @@ pub fn setup_display<'a>() -> Display {
             let scale = 12.0;
             let offset = 15.0;
             let mut rng = thread_rng();
-            let mut font = window.load_font("assets/OpenSans-Regular.ttf").unwrap();
+            let mut font = window
+                .load_font("assets/OpenSans-Regular.ttf")
+                .expect("Failed to load font");
             let mut texture_map = HashMap::new();
             let mut textures = Vec::new();
             let mut rotations = Vec::<f64>::new();
