@@ -52,7 +52,7 @@ impl Client {
             self.lang.display.render.send(Render {
                 ingredients: Some(Vec::new()),
                 subtitles: Some(String::new()),
-                background: Some("ffffffff"),
+                background: Some("000000ff"),
             })?;
 
             // Either be a client or server.

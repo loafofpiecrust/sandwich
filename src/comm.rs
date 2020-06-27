@@ -22,8 +22,8 @@ lazy_static! {
         "sandwich1" => "44000dff",
         "sandwich2" => "ffbd33ff",
         "sandwich3" => "00000000",
-        "sandwich4" => "83142cff",
-        "sandwich5" => "99b898ff",
+        "sandwich4" => "148342ff",
+        "sandwich5" => "2c5182ff",
         "sandwich6" => "00000000",
         "loafofpiecrust" => "3ca59dff",
     };
