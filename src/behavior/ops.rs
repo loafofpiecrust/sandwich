@@ -812,7 +812,7 @@ impl Message {
         Self { text, sandwich }
     }
     /// Max size in bytes of a message.
-    const MAX_SIZE: usize = 2048;
+    const MAX_SIZE: usize = 4096;
     pub async fn recv(stream: &mut TcpStream) -> anyhow::Result<Self> {
         let mut buf = [0u8; Self::MAX_SIZE];
         stream.read(&mut buf).await?;
