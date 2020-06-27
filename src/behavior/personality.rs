@@ -99,17 +99,18 @@ pub struct Personality {
 }
 impl Personality {
     pub fn new() -> Self {
+        let mut rng = thread_rng();
         let dictionary = Dictionary::new();
         Self {
             display: setup_display(),
-            planned: 0.8,
-            laziness: 0.5,
-            forgetfulness: 0.1,
-            politeness: 0.3,
-            shyness: 0.1,
+            planned: rng.gen_range(0.1, 0.9),
+            laziness: rng.gen_range(0.1, 0.9),
+            forgetfulness: rng.gen_range(0.1, 0.9),
+            politeness: rng.gen_range(0.1, 0.9),
+            shyness: rng.gen_range(0.1, 0.9),
             spite: 0.0,
             order_sensitivity: 1.0,
-            spontaneity: 0.1,
+            spontaneity: rng.gen_range(0.1, 0.9),
             allergies: vec![Preference {
                 severity: 0.6,
                 ingredient: dictionary.ingredients.random().clone(),
