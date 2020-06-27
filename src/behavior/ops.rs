@@ -816,9 +816,8 @@ impl Message {
     pub async fn recv(stream: &mut TcpStream) -> anyhow::Result<Self> {
         let mut buf = [0u8; Self::MAX_SIZE];
         stream.read_exact(&mut buf).await?;
-        // Removes trailing zeroes.
-        let s = std::str::from_utf8(&buf).unwrap();
-        Ok(serde_json::from_str(s)?)
+        let last_valid = buf.iter().rposition(|b| *b != 0).unwrap();
+        Ok(serde_json::from_slice(&buf[0..=last_valid])?)
     }
     pub async fn send(&self, stream: &mut TcpStream) -> anyhow::Result<()> {
         let mut buf = [0u8; Self::MAX_SIZE];
