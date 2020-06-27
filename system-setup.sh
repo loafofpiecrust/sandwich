@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Connect to the shared router.
-wpa_passphrase "NETGEAR48" "$2" > /etc/wpa_supplicant/wpa_supplicant.conf
+# wpa_passphrase "NETGEAR48" "$2" > /etc/wpa_supplicant/wpa_supplicant.conf
 
 # Enable ssh.
 touch /boot/ssh
@@ -19,7 +19,6 @@ rustup default stable
 
 # Project dependencies
 apt-get install git
-apt-get install xrandr
 apt-get install x11-xserver-utils
 
 # Now we'll need a reboot.
