@@ -247,7 +247,7 @@ impl Client {
             // So let's check for that.
             if msg.text.is_none() && msg.sandwich.is_none() {
                 println!("Received a completely empty message");
-                break;
+                // break;
             }
 
             if let Some(FullParse {
