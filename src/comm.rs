@@ -42,7 +42,7 @@ pub async fn find_peer() -> (std::io::Result<TcpStream>, &'static str) {
 
         println!("Attempting connection with {}", host);
         let url = format!("{}.local:{}", host, SANDWICH_PORT);
-        let stream = io::timeout(Duration::from_secs(1), TcpStream::connect(url)).await;
+        let stream = io::timeout(Duration::from_millis(300), TcpStream::connect(url)).await;
         if stream.is_ok() {
             println!("Connected to {}", host);
             return (stream, BG_COLORS[host]);

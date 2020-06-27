@@ -13,7 +13,7 @@ sudo sed -i "s/raspberrypi/$1/g" /etc/hosts
 # Set the output to HDMI, 1080p
 sudo sed -i "s/#hdmi_mode=1/hdmi_mode=82/g" /boot/config.txt
 sudo sed -i "s/#hdmi_group=1/hdmi_group=2/g" /boot/config.txt
-# Set audio output to HDMI.
+# FIXME Set audio output to HDMI.
 amixer cset numid=3 2
 
 # Hide the mouse cursor entirely.

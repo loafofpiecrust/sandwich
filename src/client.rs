@@ -56,7 +56,7 @@ impl Client {
             })?;
 
             // Either be a client or server.
-            let dur = Duration::from_millis(rng.gen_range(1000, 3000));
+            let dur = Duration::from_millis(rng.gen_range(800, 2000));
             if rng.gen_bool(0.5) {
                 if let Ok(c) = timeout(dur, comm::find_peer()).await {
                     dbg!(self.new_customer(c.0?, c.1).await);
@@ -97,7 +97,12 @@ impl Client {
 
         let (msg_sx, mut msg_rx) = channel(1);
         let recv_task = task::spawn(Self::receives_msgs(stream.clone(), msg_sx));
+        let mut failed_attempts = 0;
         loop {
+            if failed_attempts > 8 {
+                // Give up on the sandwich...
+                break;
+            }
             // Stress modifier multiplies value intesities, shortens wait times, etc.
             let stress = self.lang.stress();
 
@@ -125,10 +130,10 @@ impl Client {
             // TODO Some machines may wait for responses before sending the
             // next operation. Or start waiting if there's a buffer of
             // messages that haven't been acknowledged.
-            let min_wait = (300.0 * self.lang.shyness * 10.0 / stress) as u64;
+            let min_wait = (200.0 * self.lang.shyness * 10.0 / stress) as u64;
             let wait_time = Duration::from_millis(rng.gen_range(
                 min_wait,
-                (1000.0 * self.lang.politeness * 10.0 / stress) as u64,
+                (800.0 * self.lang.politeness * 10.0 / stress) as u64,
             ));
             task::sleep(wait_time).await;
             while let Ok(Some(msg)) = msg_rx.try_next() {
@@ -161,6 +166,8 @@ impl Client {
                 }
                 // Tell our server that they're doing a good job!
                 self.say_and_send(&mut stream, &ops::Affirm, None).await?;
+            } else {
+                failed_attempts += 1;
             }
 
             // Send over the next operation!
