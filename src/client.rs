@@ -186,7 +186,8 @@ impl Client {
                     self.lang.apply_upgrade(op.skills());
                 }
                 // Tell our server that they're doing a good job!
-                self.say_and_send(&mut stream, &ops::Affirm, None).await?;
+                self.say_and_send(&mut stream, Some(&ops::Affirm), None)
+                    .await?;
             } else {
                 failed_attempts += 1;
             }
@@ -206,7 +207,7 @@ impl Client {
                     }
                 }
                 println!("op: {:?}", op);
-                self.say_and_send(&mut stream, &*op, None).await?;
+                self.say_and_send(&mut stream, Some(&*op), None).await?;
                 // Send this operation to our history box.
                 order.archive(op);
             } else {
@@ -216,7 +217,8 @@ impl Client {
             }
         }
         // Say thank you and goodbye.
-        self.say_and_send(&mut stream, &ops::Finish, None).await?;
+        self.say_and_send(&mut stream, Some(&ops::Finish), None)
+            .await?;
         if let Some(sandwich) = order.last_result {
             self.eat_sandwich(sandwich).await?;
         }
@@ -226,14 +228,16 @@ impl Client {
     async fn say_and_send(
         &self,
         stream: &mut TcpStream,
-        op: &dyn Operation,
+        op: Option<&dyn Operation>,
         sandwich: Option<Sandwich>,
     ) -> anyhow::Result<()> {
         // TODO Save this encoding as the last lex of our own phrase.
-        let phrase = op.encode(&self.lang);
-        let s = phrase.into_iter().map(|x| x.word.to_string()).join(" ");
-        self.say_phrase(&s, sandwich.clone()).await?;
-        let message = Message::new(Some(s.to_string()), sandwich);
+        let phrase = op.map(|op| op.encode(&self.lang));
+        let s = phrase.map(|phrase| phrase.into_iter().map(|x| x.word.to_string()).join(" "));
+        if let Some(s) = s.as_ref() {
+            self.say_phrase(s, sandwich.clone()).await?;
+        }
+        let message = Message::new(s.map(|s| s.to_string()), sandwich);
         dbg!(&message);
         message.send(stream).await?;
         Ok(())
@@ -313,21 +317,13 @@ impl Client {
                 // Apply the operation to our sandwich.
                 self.last_result = op.apply(self.last_result.clone(), &mut self.lang);
                 self.lang.apply_upgrade(lang_change);
-
-                if let Some(op) = op.respond(&self.lang) {
-                    self.say_and_send(&mut stream, &*op, Some(self.last_result.clone()))
-                        .await?;
-                } else {
-                    self.lang.render(Render {
-                        subtitles: Some(String::new()),
-                        ingredients: Some(self.last_result.ingredients.clone()),
-                        background: None,
-                    })?;
-
-                    // Send the current sandwich status back over!
-                    let new_msg = Message::new(None, Some(self.last_result.clone()));
-                    new_msg.send(&mut stream).await?;
-                }
+                let resp = op.respond(&self.lang);
+                self.say_and_send(
+                    &mut stream,
+                    resp.as_ref().map(|x| &**x),
+                    Some(self.last_result.clone()),
+                )
+                .await?;
 
                 if op.is_persistent() {
                     order.persistent_ops.push(op);
