@@ -234,6 +234,7 @@ impl Client {
         let s = phrase.into_iter().map(|x| x.word.to_string()).join(" ");
         self.say_phrase(&s, sandwich.clone()).await?;
         let message = Message::new(Some(s.to_string()), sandwich);
+        dbg!(&message);
         message.send(stream).await?;
         Ok(())
     }
