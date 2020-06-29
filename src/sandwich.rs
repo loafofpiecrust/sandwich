@@ -157,6 +157,7 @@ pub const BG_COLORS: &[&str] = &["#00000000"];
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Sandwich {
     pub ingredients: Vec<Ingredient>,
+    pub ensured: Vec<Ingredient>,
     pub complete: bool,
     pub background_color: String,
 }
@@ -164,6 +165,7 @@ impl Sandwich {
     pub fn new(ingredients: Vec<Ingredient>) -> Self {
         Self {
             ingredients,
+            ensured: Vec::new(),
             complete: false,
             background_color: BG_COLORS[0].into(),
         }
@@ -184,6 +186,7 @@ impl Sandwich {
         ingredients.push(top.clone());
         Self {
             ingredients,
+            ensured: Default::default(),
             complete: true,
             background_color: BG_COLORS.choose(&mut rng).unwrap().to_string(),
         }

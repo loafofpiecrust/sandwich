@@ -337,7 +337,8 @@ impl Operation for Compound {
 #[derive(Debug)]
 pub struct Ensure(pub Ingredient);
 impl Operation for Ensure {
-    fn apply(&self, sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
+    fn apply(&self, mut sandwich: Sandwich, personality: &mut Personality) -> Sandwich {
+        sandwich.ensured.push(self.0.clone());
         sandwich
     }
     fn reverse(&self) -> Box<dyn Operation> {
@@ -774,7 +775,9 @@ impl Order {
         let next_ingr = self.desired.ingredients.get(next_idx);
         next_ingr.map(|next_ingr| {
             // Maybe ask if they have the ingredient we want.
-            if rng.gen_bool(personality.shyness / personality.stress()) {
+            if !self.desired.ensured.contains(next_ingr)
+                && rng.gen_bool(personality.shyness / personality.stress())
+            {
                 return Box::new(CheckFor(next_ingr.clone())) as Box<dyn Operation>;
             }
 

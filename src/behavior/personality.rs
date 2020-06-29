@@ -269,6 +269,7 @@ impl Personality {
         ingredients.push(top.clone());
         Sandwich {
             ingredients,
+            ensured: Default::default(),
             complete: true,
             background_color: BG_COLORS.choose(&mut rng).unwrap().to_string(),
         }
