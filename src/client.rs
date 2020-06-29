@@ -234,10 +234,8 @@ impl Client {
         // TODO Save this encoding as the last lex of our own phrase.
         let phrase = op.map(|op| op.encode(&self.lang));
         let s = phrase.map(|phrase| phrase.into_iter().map(|x| x.word.to_string()).join(" "));
-        if let Some(s) = s.as_ref() {
-            self.say_phrase(s, sandwich.clone()).await?;
-        }
-        let message = Message::new(s.map(|s| s.to_string()), sandwich);
+        self.say_phrase(s.as_deref(), sandwich.clone()).await?;
+        let message = Message::new(s.to_owned(), sandwich);
         dbg!(&message);
         message.send(stream).await?;
         Ok(())
@@ -349,11 +347,11 @@ impl Client {
     /// another machine with the given stream.
     async fn say_phrase(
         &self,
-        phrase: &str,
+        phrase: Option<&str>,
         sandwich: Option<Sandwich>,
         // stream: &mut TcpStream,
     ) -> anyhow::Result<()> {
-        println!("saying {}", phrase);
+        println!("saying {:?}", phrase);
         // println!("{:?}", self.parse(phrase));
         println!("with sandwich {:?}", sandwich);
 
@@ -364,14 +362,17 @@ impl Client {
         self.lang.render(Render {
             ingredients: sandwich.map(|x| x.ingredients),
             // subtitles: self.parse(phrase).map(|x| x.subtitles()),
-            subtitles: self
-                .lex(phrase)
-                .map(|w| w.into_iter().map(|w| w.entry.unwrap().definition).join(" ")),
+            subtitles: phrase.as_ref().and_then(|phrase| {
+                self.lex(phrase)
+                    .map(|w| w.into_iter().map(|w| w.entry.unwrap().definition).join(" "))
+            }),
             background: None,
         })?;
 
         // Play the phrase out loud.
-        audio::play_phrase(phrase, self.lang.pitch_shift)?;
+        if let Some(p) = phrase {
+            audio::play_phrase(p, self.lang.pitch_shift)?;
+        }
 
         // Send the other our words.
         // let mut str_buf = [0; 512];
