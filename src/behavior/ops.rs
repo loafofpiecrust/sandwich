@@ -520,12 +520,11 @@ impl Operation for CheckFor {
     }
     fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
         // If we have the asked for ingredient, respond positively.
-        // if !personality.has_ingredient(&self.0) {
-        //     Some(Box::new(Remove(self.0.clone())))
-        // } else {
-        None
-        // Some(Box::new(Ensure(self.0.clone())))
-        // }
+        if !personality.has_ingredient(&self.0) {
+            Some(Box::new(Remove(self.0.clone())))
+        } else {
+            Some(Box::new(Ensure(self.0.clone())))
+        }
     }
     fn question(&self) -> Box<dyn Operation> {
         // A questioned question becomes a statement.

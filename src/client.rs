@@ -84,11 +84,13 @@ impl Client {
                 background: Some(if color_alt { "000000ff" } else { "ffffffff" }),
             })?;
 
-            ingredients.pop();
-            color_alt = !color_alt;
-
             // Savor the sandwich!
             task::sleep(Duration::from_millis(800)).await;
+
+            let top = ingredients.pop();
+            color_alt = !color_alt;
+
+            // TODO Check for allergic reaction!
         }
         // Now eat the sandwich, and save in our history.
         self.lang.eat(sandwich);
