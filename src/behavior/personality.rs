@@ -85,6 +85,8 @@ pub struct Personality {
     pub numbers: f64,
     pub pitch_shift: f64,
     /// Maps ingredient names to their inventory count.
+    /// Doesn't save between sessions.
+    #[serde(skip)]
     pub inventory: Inventory,
     pub history: Vec<Sandwich>,
     pub cloud: MeaningCloud,
