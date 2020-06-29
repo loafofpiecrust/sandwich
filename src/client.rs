@@ -73,15 +73,25 @@ impl Client {
     }
 
     async fn eat_sandwich(&mut self, sandwich: Sandwich) -> anyhow::Result<()> {
-        self.lang.render(Render {
-            ingredients: Some(sandwich.ingredients),
-            subtitles: Some(String::new()),
-            background: Some("000000ff"),
-        })?;
+        // Eat the sandwich ingredient by ingredient.
+        // Alternate between background colors.
+        let mut ingredients = sandwich.ingredients.clone();
+        let mut color_alt = false;
+        while !ingredients.is_empty() {
+            self.lang.render(Render {
+                ingredients: Some(ingredients.clone()),
+                subtitles: Some(String::new()),
+                background: Some(if color_alt { "000000ff" } else { "ffffffff" }),
+            })?;
+
+            ingredients.pop();
+            color_alt = !color_alt;
+
+            // Savor the sandwich!
+            task::sleep(Duration::from_millis(800)).await;
+        }
         // Now eat the sandwich, and save in our history.
-        self.lang.eat(self.last_result.clone());
-        // Savor the sandwich!
-        task::sleep(Duration::from_secs(3)).await;
+        self.lang.eat(sandwich);
         Ok(())
     }
 
