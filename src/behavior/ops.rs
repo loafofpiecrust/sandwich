@@ -345,13 +345,15 @@ impl Operation for Ensure {
         Box::new(Remove(self.0.clone()))
     }
     fn encode(&self, lang: &Personality) -> AnnotatedPhrase {
-        todo!()
+        let verb = lang.dictionary.annotated_word_for_def(WordFunction::Have);
+        let ingr = lang.dictionary.ingredients.to_annotated_word(&self.0);
+        vec![ingr, verb];
     }
     fn is_persistent(&self) -> bool {
         false
     }
     fn skills(&self) -> Language {
-        todo!()
+        Default::default()
     }
     fn respond(&self, personality: &Personality) -> Option<Box<dyn Operation>> {
         None
