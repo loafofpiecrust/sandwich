@@ -564,7 +564,7 @@ impl Operation for CheckFor {
 pub struct Order {
     pub desired: Sandwich,
     history: Vec<Box<dyn Operation>>,
-    last_result: Option<Sandwich>,
+    pub last_result: Option<Sandwich>,
     pub persistent_ops: Vec<Box<dyn Operation>>,
 }
 impl Order {

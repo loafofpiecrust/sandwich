@@ -49,11 +49,7 @@ impl Client {
 
         loop {
             // Clear the display.
-            self.lang.display.render.send(Render {
-                ingredients: Some(Vec::new()),
-                subtitles: Some(String::new()),
-                background: Some("000000ff"),
-            })?;
+            self.lang.render(Render::clear())?;
 
             // Either be a client or server.
             let dur = Duration::from_millis(rng.gen_range(800, 2000));
@@ -74,6 +70,19 @@ impl Client {
         loop {
             chan.send(Message::recv(&mut stream).await?).await?;
         }
+    }
+
+    async fn eat_sandwich(&mut self, sandwich: Sandwich) -> anyhow::Result<()> {
+        self.lang.render(Render {
+            ingredients: Some(sandwich.ingredients),
+            subtitles: Some(String::new()),
+            background: Some("000000ff"),
+        })?;
+        // Now eat the sandwich, and save in our history.
+        self.lang.eat(self.last_result.clone());
+        // Savor the sandwich!
+        task::sleep(Duration::from_secs(3)).await;
+        Ok(())
     }
 
     async fn new_customer(
@@ -196,8 +205,9 @@ impl Client {
         }
         // Say thank you and goodbye.
         self.say_and_send(&mut stream, &ops::Finish, None).await?;
-        // Now eat the sandwich, and save in our history.
-        self.lang.eat(self.last_result.clone());
+        if let Some(sandwich) = order.last_result {
+            self.eat_sandwich(sandwich).await?;
+        }
         Ok(())
     }
 

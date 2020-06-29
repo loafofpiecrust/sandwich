@@ -13,6 +13,15 @@ pub struct Render {
     pub subtitles: Option<String>,
     pub background: Option<&'static str>,
 }
+impl Render {
+    pub fn clear() -> Self {
+        Self {
+            ingredients: Some(Default::default()),
+            subtitles: Some(Default::default()),
+            background: Some("000000ff"),
+        }
+    }
+}
 
 pub struct Display {
     pub render: RenderSender,
