@@ -263,9 +263,8 @@ impl Client {
             // ...and dispatch them.
             // For now, all key codes to all clients.
             for (host, stream) in &mut connections {
-                if let Some(stream) = stream.as_mut() {
-                    DispatchMessage::new(key).send(stream).await?;
-                }
+                println!("sending {:?} to {}", key, host);
+                DispatchMessage::new(key).send(stream).await?;
             }
         }
         Ok(())
@@ -277,21 +276,25 @@ impl Client {
             let mut connection = comm::wait_for_central_dispatch()
                 .await
                 .expect("Couldn't connect to central dispatch");
-            println!("Central dispatch connected!");
             loop {
                 if let Ok(msg) = DispatchMessage::recv(&mut connection).await {
                     match msg.key {
                         Button::Keyboard(Key::A) => {
-                            sx.send(|p| p.increase_preference("avocado"));
+                            sx.send(|p| {
+                                println!("AVOCADO!!");
+                                p.increase_preference("avocado")
+                            })
+                            .await;
                         }
                         Button::Keyboard(Key::E) => {
-                            sx.send(|p| p.increase_preference("fried-egg"));
+                            sx.send(|p| p.increase_preference("fried-egg")).await;
                         }
                         Button::Keyboard(Key::S) => {
-                            sx.send(|p| p.spite += 0.1);
+                            sx.send(|p| p.spite += 0.1).await;
                         }
                         Button::Keyboard(Key::R) => {
-                            sx.send(|p| p.event = Some(Event::LunchRush(Instant::now())));
+                            sx.send(|p| p.event = Some(Event::LunchRush(Instant::now())))
+                                .await;
                         }
                         _ => {}
                     }

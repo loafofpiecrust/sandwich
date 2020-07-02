@@ -78,15 +78,16 @@ pub async fn wait_for_central_dispatch() -> std::io::Result<TcpStream> {
 }
 
 // Returns a map of hostname to the relevant TCP stream.
-pub async fn central_dispatch() -> HashMap<&'static str, Option<TcpStream>> {
+pub async fn central_dispatch() -> HashMap<&'static str, TcpStream> {
     let ourselves = hostname::get().expect("We should have a hostname");
     let our_name = ourselves.as_os_str().to_str().unwrap();
     let mut result = HashMap::new();
     for host in HOSTS {
-        if !host.eq_ignore_ascii_case(our_name) {
-            let url = format!("{}.local:{}", host, DISPATCH_PORT);
-            let stream = io::timeout(Duration::from_millis(2000), TcpStream::connect(url)).await;
-            result.insert(*host, stream.ok());
+        let url = format!("{}.local:{}", host, DISPATCH_PORT);
+        println!("Attempting connection with {}", url);
+        let stream = io::timeout(Duration::from_millis(2000), TcpStream::connect(url)).await;
+        if let Ok(s) = stream {
+            result.insert(*host, s);
         }
     }
     result

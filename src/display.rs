@@ -135,7 +135,10 @@ pub fn setup_display<'a>() -> Display {
                 // Add some keybindings for testing out real-time interaction.
                 if let Some(k) = e.button_args() {
                     if k.state == ButtonState::Press {
-                        key_sx.send(k.button);
+                        println!("key press: {:?}", k);
+                        key_sx
+                            .send(k.button)
+                            .expect("Failed to send key press from window");
                     }
                 };
             }
