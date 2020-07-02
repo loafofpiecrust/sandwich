@@ -255,6 +255,7 @@ impl Client {
     }
 
     pub async fn central_dispatch(&self) -> anyhow::Result<()> {
+        println!("running central dispatch");
         // Connect to all sandwich machines.
         let mut connections = comm::central_dispatch().await;
         // Then accept real-time events from the window...
@@ -276,6 +277,7 @@ impl Client {
             let mut connection = comm::wait_for_central_dispatch()
                 .await
                 .expect("Couldn't connect to central dispatch");
+            println!("Central dispatch connected!");
             loop {
                 if let Ok(msg) = DispatchMessage::recv(&mut connection).await {
                     match msg.key {
