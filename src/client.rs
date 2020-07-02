@@ -272,10 +272,10 @@ impl Client {
 
     async fn connect_to_central_dispatch() -> Receiver<PersonalityAction> {
         let (mut sx, rx) = channel::<PersonalityAction>(1);
+        let mut connection = comm::wait_for_central_dispatch()
+            .await
+            .expect("Couldn't connect to central dispatch");
         task::spawn(async move {
-            let mut connection = comm::wait_for_central_dispatch()
-                .await
-                .expect("Couldn't connect to central dispatch");
             loop {
                 if let Ok(msg) = DispatchMessage::recv(&mut connection).await {
                     match msg.key {

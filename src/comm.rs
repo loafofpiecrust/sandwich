@@ -86,6 +86,7 @@ pub async fn central_dispatch() -> HashMap<&'static str, TcpStream> {
         let url = format!("{}.local:{}", host, DISPATCH_PORT);
         println!("Attempting connection with {}", url);
         let stream = io::timeout(Duration::from_millis(2000), TcpStream::connect(url)).await;
+        println!("Connection to {}: {:?}", host, stream);
         if let Ok(s) = stream {
             result.insert(*host, s);
         }
