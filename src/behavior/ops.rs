@@ -21,13 +21,11 @@
 
 use crate::{
     behavior::{Language, Personality},
-    grammar::{
-        self, AnnotatedPhrase, AnnotatedWord, DictionaryEntry, WordFunction, DEFAULT_WORD_MAP,
-    },
+    grammar::{AnnotatedPhrase, WordFunction},
     sandwich::{Ingredient, Sandwich},
 };
-use async_std::net::TcpStream;
-use async_std::prelude::*;
+use async_std::{net::TcpStream, prelude::*};
+use piston_window::Button;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -347,7 +345,7 @@ impl Operation for Ensure {
     fn encode(&self, lang: &Personality) -> AnnotatedPhrase {
         let verb = lang.dictionary.annotated_word_for_def(WordFunction::Have);
         let ingr = lang.dictionary.ingredients.to_annotated_word(&self.0);
-        vec![ingr, verb];
+        vec![ingr, verb]
     }
     fn is_persistent(&self) -> bool {
         false
@@ -818,6 +816,33 @@ impl Message {
     /// Max size in bytes of a message.
     const MAX_SIZE: usize = 4096;
     pub async fn recv(stream: &mut TcpStream) -> anyhow::Result<Self> {
+        let mut buf = [0u8; Self::MAX_SIZE];
+        // Always read the same packet size.
+        // TODO Just read until valid json is complete?
+        stream.read_exact(&mut buf).await?;
+        // Trim trailing zeroes for json parsing.
+        let last_valid = buf.iter().rposition(|b| *b != 0).unwrap();
+        Ok(serde_json::from_slice(&buf[0..=last_valid])?)
+    }
+    pub async fn send(&self, stream: &mut TcpStream) -> anyhow::Result<()> {
+        let mut buf = [0u8; Self::MAX_SIZE];
+        serde_json::to_writer(&mut buf as &mut [u8], self)?;
+        stream.write(&buf).await?;
+        Ok(())
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DispatchMessage {
+    pub key: Button,
+}
+impl DispatchMessage {
+    pub fn new(key: Button) -> Self {
+        Self { key }
+    }
+    /// Max size in bytes of a message.
+    const MAX_SIZE: usize = 512;
+    pub async fn recv(stream: &mut TcpStream) -> anyhow::Result<DispatchMessage> {
         let mut buf = [0u8; Self::MAX_SIZE];
         // Always read the same packet size.
         // TODO Just read until valid json is complete?

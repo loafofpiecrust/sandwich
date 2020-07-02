@@ -26,6 +26,7 @@ impl Render {
 pub struct Display {
     pub render: RenderSender,
     pub actions: Receiver<PersonalityAction>,
+    pub keys: Receiver<Button>,
 }
 
 pub type PersonalityAction = fn(&mut Personality) -> ();
@@ -35,6 +36,7 @@ pub type RenderSender = SyncSender<Render>;
 pub fn setup_display<'a>() -> Display {
     let (sender, receiver) = sync_channel::<Render>(1);
     let (action_sx, action_rx) = sync_channel::<PersonalityAction>(1);
+    let (key_sx, key_rx) = sync_channel(1);
     task::spawn(async move {
         let window = std::panic::catch_unwind(|| {
             WindowSettings::new("SANDWICH", (1920, 1080))
@@ -133,23 +135,7 @@ pub fn setup_display<'a>() -> Display {
                 // Add some keybindings for testing out real-time interaction.
                 if let Some(k) = e.button_args() {
                     if k.state == ButtonState::Press {
-                        match k.button {
-                            Button::Keyboard(Key::A) => {
-                                action_sx.send(|p| p.increase_preference("avocado"));
-                            }
-                            Button::Keyboard(Key::E) => {
-                                action_sx.send(|p| p.increase_preference("fried-egg"));
-                            }
-                            Button::Keyboard(Key::S) => {
-                                action_sx.send(|p| p.spite += 0.1);
-                            }
-                            Button::Keyboard(Key::R) => {
-                                action_sx.send(|p| {
-                                    p.event = Some(personality::Event::LunchRush(Instant::now()))
-                                });
-                            }
-                            _ => {}
-                        }
+                        key_sx.send(k.button);
                     }
                 };
             }
@@ -164,5 +150,6 @@ pub fn setup_display<'a>() -> Display {
     Display {
         render: sender,
         actions: action_rx,
+        keys: key_rx,
     }
 }

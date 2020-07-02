@@ -18,7 +18,11 @@ use std::time::Duration;
 async fn main() -> anyhow::Result<()> {
     let mut c = Client::new();
     c.add_behavior(behavior::Forgetful::new(0.3));
-    c.connect_with_peer().await
+    if comm::is_dispatch_host() {
+        c.central_dispatch().await
+    } else {
+        c.connect_with_peer().await
+    }
 }
 
 pub fn wait_randomly(millis: u64) {

@@ -1,13 +1,16 @@
+use crate::behavior::{self, Event, Operation};
 use async_std::io;
 use async_std::net::{TcpListener, TcpStream};
 use hostname;
 use lazy_static::*;
 use maplit::*;
 use rand::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
 
 const SANDWICH_PORT: u16 = 34222;
+const DISPATCH_PORT: u16 = 34223;
 const HOSTS: &[&str] = &[
     "sandwich1",
     "sandwich2",
@@ -15,8 +18,8 @@ const HOSTS: &[&str] = &[
     "sandwich4",
     "sandwich5",
     "sandwich6",
-    "loafofpiecrust",
 ];
+const DISPATCH_HOST: &str = "loafofpiecrust";
 lazy_static! {
     pub static ref BG_COLORS: HashMap<&'static str, &'static str> = hashmap! {
         "sandwich1" => "44000dff",
@@ -27,6 +30,12 @@ lazy_static! {
         "sandwich6" => "00000000",
         "loafofpiecrust" => "3ca59dff",
     };
+}
+
+pub fn is_dispatch_host() -> bool {
+    let ourselves = hostname::get().expect("We should have a hostname");
+    let our_name = ourselves.as_os_str().to_str().unwrap();
+    our_name == DISPATCH_HOST
 }
 
 pub async fn find_peer() -> (std::io::Result<TcpStream>, &'static str) {
@@ -60,3 +69,31 @@ pub async fn wait_for_peer() -> (std::io::Result<TcpStream>, &'static str) {
     let hostname = ourselves.as_os_str().to_str().unwrap().to_lowercase();
     (Ok(stream), BG_COLORS[&hostname as &str])
 }
+
+pub async fn wait_for_central_dispatch() -> std::io::Result<TcpStream> {
+    let conn = TcpListener::bind(format!("0.0.0.0:{}", DISPATCH_PORT)).await?;
+    let (stream, _addr) = conn.accept().await?;
+    println!("Dispatch connected.");
+    Ok(stream)
+}
+
+// Returns a map of hostname to the relevant TCP stream.
+pub async fn central_dispatch() -> HashMap<&'static str, Option<TcpStream>> {
+    let ourselves = hostname::get().expect("We should have a hostname");
+    let our_name = ourselves.as_os_str().to_str().unwrap();
+    let mut result = HashMap::new();
+    for host in HOSTS {
+        if !host.eq_ignore_ascii_case(our_name) {
+            let url = format!("{}.local:{}", host, DISPATCH_PORT);
+            let stream = io::timeout(Duration::from_millis(2000), TcpStream::connect(url)).await;
+            result.insert(*host, stream.ok());
+        }
+    }
+    result
+}
+
+// #[derive(Serialize, Deserialize)]
+// pub enum DispatchMessage {
+//     Op(Box<dyn Operation>),
+//     Event(Event),
+// }

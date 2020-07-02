@@ -35,6 +35,7 @@ impl std::ops::Add for Language {
     }
 }
 
+// #[derive(Serialize, Deserialize)]
 pub enum Event {
     LunchRush(Instant),
 }

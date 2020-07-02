@@ -1,8 +1,10 @@
 use crate::{
     audio,
-    behavior::{ops, Behavior, Encoder, Message, Operation, Order, Personality},
+    behavior::{
+        ops, Behavior, DispatchMessage, Encoder, Event, Message, Operation, Order, Personality,
+    },
     comm,
-    display::Render,
+    display::{PersonalityAction, Render},
     grammar,
     grammar::FullParse,
     sandwich::Sandwich,
@@ -16,11 +18,15 @@ use async_std::task;
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::sink::SinkExt;
 use itertools::Itertools;
+use piston_window::{Button, Key};
 use rand::prelude::*;
 // use futures::prelude::*;
 use futures::{pin_mut, select, FutureExt};
 use grammar::{sentence_new, Dictionary, PhraseNode};
-use std::{thread, time::Duration};
+use std::{
+    thread,
+    time::{Duration, Instant},
+};
 
 pub struct Client {
     /// We'll have a few words with default parts of speech if totally ambiguous.
@@ -47,7 +53,14 @@ impl Client {
         // Keep doing sandwich interactions forever.
         // Rotate between trying to be a customer and trying to be a server.
 
+        let mut actions = Self::connect_to_central_dispatch().await;
+
         loop {
+            // TODO Allow actions to apply *during* an order too.
+            while let Ok(Some(action)) = actions.try_next() {
+                action(&mut self.lang);
+            }
+
             // Clear the display.
             self.lang.render(Render::clear())?;
 
@@ -134,9 +147,9 @@ impl Client {
                 }
             }
 
-            while let Ok(action) = self.lang.display.actions.try_recv() {
-                action(&mut self.lang);
-            }
+            // while let Ok(action) = self.lang.display.actions.try_recv() {
+            //     action(&mut self.lang);
+            // }
 
             // Save our personality frequently.
             self.lang.save()?;
@@ -241,6 +254,51 @@ impl Client {
         Ok(())
     }
 
+    pub async fn central_dispatch(&self) -> anyhow::Result<()> {
+        // Connect to all sandwich machines.
+        let mut connections = comm::central_dispatch().await;
+        // Then accept real-time events from the window...
+        while let Ok(key) = self.lang.display.keys.recv() {
+            // ...and dispatch them.
+            // For now, all key codes to all clients.
+            for (host, stream) in &mut connections {
+                if let Some(stream) = stream.as_mut() {
+                    DispatchMessage::new(key).send(stream).await?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn connect_to_central_dispatch() -> Receiver<PersonalityAction> {
+        let (mut sx, rx) = channel::<PersonalityAction>(1);
+        task::spawn(async move {
+            let mut connection = comm::wait_for_central_dispatch()
+                .await
+                .expect("Couldn't connect to central dispatch");
+            loop {
+                if let Ok(msg) = DispatchMessage::recv(&mut connection).await {
+                    match msg.key {
+                        Button::Keyboard(Key::A) => {
+                            sx.send(|p| p.increase_preference("avocado"));
+                        }
+                        Button::Keyboard(Key::E) => {
+                            sx.send(|p| p.increase_preference("fried-egg"));
+                        }
+                        Button::Keyboard(Key::S) => {
+                            sx.send(|p| p.spite += 0.1);
+                        }
+                        Button::Keyboard(Key::R) => {
+                            sx.send(|p| p.event = Some(Event::LunchRush(Instant::now())));
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        });
+        rx
+    }
+
     async fn new_server(
         &mut self,
         mut stream: TcpStream,
@@ -277,9 +335,9 @@ impl Client {
             }
 
             // If there's been user interaction, make sure to apply the results.
-            while let Ok(action) = self.lang.display.actions.try_recv() {
-                action(&mut self.lang);
-            }
+            // while let Ok(Some(action)) = actions.try_next() {
+            //     action(&mut self.lang);
+            // }
 
             // Save our personality frequently.
             self.lang.save()?;
@@ -427,68 +485,4 @@ impl Client {
         }
         Ok(())
     }
-    // async fn end_order(&mut self, other: &mut TcpStream) -> anyhow::Result<()> {
-    //     for b in &self.behaviors {
-    //         b.end();
-    //     }
-    //     let sandwich = self.greet(other).await?;
-    //     self.state.respond(
-    //         &PhraseNode::Empty,
-    //         sandwich.as_ref(),
-    //         &self.lang,
-    //         &mut *self.encoder,
-    //         &mut self.behaviors,
-    //     );
-    //     // self.sandwich = None;
-    //     Ok(())
-    // }
-    // async fn greet(&self, other: &mut TcpStream) -> anyhow::Result<Option<Sandwich>> {
-    //     let (hello, _) = self.lang.dictionary.word_for_def(WordFunction::Greeting);
-
-    //     // self.say_phrase(hello, None, other).await?;
-
-    //     // And wait for a response!
-    //     let resp: String = {
-    //         let mut buf = [0; 512];
-    //         other.read(&mut buf).await?;
-    //         bincode::deserialize(&buf)?
-    //     };
-    //     let sandwich: Option<Sandwich> = {
-    //         let mut buf = [0; 512];
-    //         other.read(&mut buf).await?;
-    //         bincode::deserialize(&buf)?
-    //     };
-
-    //     println!("{}", resp);
-    //     println!("Received sandwich: {:?}", sandwich);
-    //     Ok(sandwich)
-    // }
-    // pub fn next_phrase(&mut self) -> Option<String> {
-    //     let sandwich = self.sandwich.as_ref().unwrap();
-
-    //     let mut next_ingredient = Some(self.next_index);
-    //     // Allow behavior to change what the next ingredient might be.
-    //     for b in &mut self.behaviors {
-    //         next_ingredient = b.next_ingredient(sandwich, next_ingredient);
-    //     }
-
-    //     if let Some(idx) = next_ingredient {
-    //         if idx >= sandwich.ingredients.len() {
-    //             return None;
-    //         }
-    //         let result = Some(self.encoder.encode(
-    //             &self.lang,
-    //             PositionedIngredient {
-    //                 sandwich,
-    //                 index: idx,
-    //                 history: &self.history[..],
-    //             },
-    //         ));
-    //         self.history.push(idx);
-    //         self.next_index = self.history.iter().max().unwrap_or(&0) + 1;
-    //         result
-    //     } else {
-    //         None
-    //     }
-    // }
 }
