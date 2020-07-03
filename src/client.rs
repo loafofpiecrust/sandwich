@@ -255,17 +255,32 @@ impl Client {
     }
 
     pub async fn central_dispatch(&self) -> anyhow::Result<()> {
+        let mut exclusive_host = None;
         println!("running central dispatch");
         // Connect to all sandwich machines.
         let mut connections = comm::central_dispatch().await;
         // Then accept real-time events from the window...
         while let Ok(key) = self.lang.display.keys.recv() {
-            // ...and dispatch them.
-            // For now, all key codes to all clients.
-            for (host, stream) in &mut connections {
-                println!("sending {:?} to {}", key, host);
-                DispatchMessage::new(key).send(stream).await?;
-            }
+            match key {
+                Button::Keyboard(Key::D1) => exclusive_host = Some(&comm::HOSTS[0]),
+                Button::Keyboard(Key::D2) => exclusive_host = Some(&comm::HOSTS[1]),
+                Button::Keyboard(Key::D3) => exclusive_host = Some(&comm::HOSTS[2]),
+                Button::Keyboard(Key::D4) => exclusive_host = Some(&comm::HOSTS[3]),
+                Button::Keyboard(Key::D5) => exclusive_host = Some(&comm::HOSTS[4]),
+                Button::Keyboard(Key::D6) => exclusive_host = Some(&comm::HOSTS[5]),
+                Button::Keyboard(Key::D0) => exclusive_host = None,
+                _ => {
+                    // ...and dispatch them.
+                    // For now, all key codes to all clients.
+                    for (host, stream) in &mut connections {
+                        let matches = exclusive_host.map(|h| host == h).unwrap_or(true);
+                        if matches {
+                            println!("sending {:?} to {}", key, host);
+                            DispatchMessage::new(key).send(stream).await?;
+                        }
+                    }
+                }
+            };
         }
         Ok(())
     }

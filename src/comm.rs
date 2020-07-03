@@ -11,7 +11,7 @@ use std::time::Duration;
 
 const SANDWICH_PORT: u16 = 34222;
 const DISPATCH_PORT: u16 = 34223;
-const HOSTS: &[&str] = &[
+pub const HOSTS: &[&str] = &[
     "sandwich1",
     "sandwich2",
     "sandwich3",
@@ -86,7 +86,6 @@ pub async fn central_dispatch() -> HashMap<&'static str, TcpStream> {
         let url = format!("{}.local:{}", host, DISPATCH_PORT);
         println!("Attempting connection with {}", url);
         let stream = io::timeout(Duration::from_millis(1000), TcpStream::connect(url)).await;
-        println!("Connection to {} (err: {:?})", host, stream.err());
         if let Ok(s) = stream {
             result.insert(*host, s);
         }
