@@ -82,12 +82,20 @@ pub async fn central_dispatch() -> HashMap<&'static str, TcpStream> {
     let ourselves = hostname::get().expect("We should have a hostname");
     let our_name = ourselves.as_os_str().to_str().unwrap();
     let mut result = HashMap::new();
-    for host in HOSTS {
-        let url = format!("{}.local:{}", host, DISPATCH_PORT);
-        println!("Attempting connection with {}", url);
-        let stream = io::timeout(Duration::from_millis(1000), TcpStream::connect(url)).await;
-        if let Ok(s) = stream {
-            result.insert(*host, s);
+    // Try up to five times to connect to all hosts.
+    for _ in 0..5 {
+        for host in HOSTS {
+            if !result.contains_key(host) {
+                let url = format!("{}.local:{}", host, DISPATCH_PORT);
+                println!("Attempting connection with {}", url);
+                let stream = io::timeout(Duration::from_millis(800), TcpStream::connect(url)).await;
+                if let Ok(s) = stream {
+                    result.insert(*host, s);
+                }
+            }
+        }
+        if result.len() == HOSTS.len() {
+            break;
         }
     }
     result

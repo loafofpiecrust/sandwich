@@ -112,8 +112,13 @@ impl Client {
                 }
             }
         }
+
         // Now eat the sandwich, and save in our history.
         self.lang.eat(sandwich);
+
+        // Make sure there's a delay between orders.
+        task::sleep(Duration::from_millis(500)).await;
+
         Ok(())
     }
 
@@ -169,7 +174,7 @@ impl Client {
         let (msg_sx, mut msg_rx) = channel(1);
         let recv_task = task::spawn(Self::receives_msgs(stream.clone(), msg_sx));
         let mut failed_attempts = 0;
-        loop {
+        'order: loop {
             if failed_attempts > 8 {
                 // Give up on the sandwich...
                 break;
@@ -207,26 +212,33 @@ impl Client {
                 (800.0 * self.lang.politeness * 10.0 / stress) as u64,
             ));
             task::sleep(wait_time).await;
-            while let Ok(Some(msg)) = msg_rx.try_next() {
-                if let Some(sandwich) = msg.sandwich {
-                    println!("received {}", sandwich);
-                    self.last_result = sandwich;
-                }
-
-                // If the server sent back any changes to our order, like them
-                // being out of an ingredient, apply that to our desired sandwich.
-                if let Some(FullParse { operation, lex, .. }) =
-                    msg.text.and_then(|t| self.parse(&t))
-                {
-                    println!("Received response op: {:?}", operation);
-                    order.desired = operation.apply(order.desired.clone(), &mut self.lang);
-                    self.lang.last_lex = Some(lex);
-
-                    // If we asked a question that caused a change in our
-                    // sandwich, affirm that we understood it.
-                    if order.last_question_failed(&mut self.lang, &self.last_result) {
-                        order.desired = ops::Affirm.apply(order.desired.clone(), &mut self.lang);
+            while let Ok(msg) = msg_rx.try_next() {
+                if let Some(msg) = msg {
+                    // We have received a message!
+                    if let Some(sandwich) = msg.sandwich {
+                        println!("received {}", sandwich);
+                        self.last_result = sandwich;
                     }
+
+                    // If the server sent back any changes to our order, like them
+                    // being out of an ingredient, apply that to our desired sandwich.
+                    if let Some(FullParse { operation, lex, .. }) =
+                        msg.text.and_then(|t| self.parse(&t))
+                    {
+                        println!("Received response op: {:?}", operation);
+                        order.desired = operation.apply(order.desired.clone(), &mut self.lang);
+                        self.lang.last_lex = Some(lex);
+
+                        // If we asked a question that caused a change in our
+                        // sandwich, affirm that we understood it.
+                        if order.last_question_failed(&mut self.lang, &self.last_result) {
+                            order.desired =
+                                ops::Affirm.apply(order.desired.clone(), &mut self.lang);
+                        }
+                    }
+                } else {
+                    // The channel to our server is closed, end the order safely.
+                    break 'order;
                 }
             }
 
