@@ -131,7 +131,7 @@ impl Personality {
             adposition: 0.1,
             conjunction: 0.1,
             numbers: 0.1,
-            pitch_shift: thread_rng().gen_range(0.5, 2.0),
+            pitch_shift: thread_rng().gen_range(0.3, 1.7),
             inventory: Self::default_inventory(&dictionary),
             dictionary,
             last_lex: None,

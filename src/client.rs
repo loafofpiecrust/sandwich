@@ -476,11 +476,17 @@ impl Client {
         // Convert phrase to subtitles!
         self.lang.render(Render {
             ingredients: sandwich.map(|x| x.ingredients),
-            // subtitles: self.parse(phrase).map(|x| x.subtitles()),
-            subtitles: phrase.as_ref().and_then(|phrase| {
-                self.lex(phrase)
-                    .map(|w| w.into_iter().map(|w| w.entry.unwrap().definition).join(" "))
-            }),
+            // Always render a string, so that the current subtitles go away
+            // next time we say/do anything.
+            subtitles: Some(
+                phrase
+                    .as_ref()
+                    .and_then(|phrase| {
+                        self.lex(phrase)
+                            .map(|w| w.into_iter().map(|w| w.entry.unwrap().definition).join(" "))
+                    })
+                    .unwrap_or(String::new()),
+            ),
             background: None,
         })?;
 
