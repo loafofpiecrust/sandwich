@@ -400,7 +400,7 @@ impl Client {
             self.lang.save()?;
 
             // TODO This machine might wait to receive multiple operations before applying them all at once.
-            let msg = timeout(Duration::from_secs(5), Message::recv(&mut stream)).await??;
+            let msg = timeout(Duration::from_secs(20), Message::recv(&mut stream)).await??;
 
             // If there are zeroes, we might parse as a (None, None) accidentally.
             // So let's check for that.
