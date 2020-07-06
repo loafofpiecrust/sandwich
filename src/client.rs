@@ -103,15 +103,24 @@ impl Client {
             let top = ingredients.pop();
             color_alt = !color_alt;
 
-            // TODO Check for allergic reaction!
+            // If we're allergic to this ingredient, we might have a reaction.
             if let Some(top) = top {
                 if self.lang.allergic_reaction(&top) {
                     self.have_seizure(top).await?;
+                    self.death_and_rebirth().await?;
+                    break;
                 }
             }
         }
         // Now eat the sandwich, and save in our history.
         self.lang.eat(sandwich);
+        Ok(())
+    }
+
+    async fn death_and_rebirth(&mut self) -> anyhow::Result<()> {
+        self.lang.render(Render::clear())?;
+        self.lang = Personality::new();
+        task::sleep(Duration::from_millis(1500)).await;
         Ok(())
     }
 
