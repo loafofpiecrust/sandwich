@@ -284,6 +284,16 @@ impl Personality {
         self.history.insert(0, sandwich);
         self.history.truncate(10);
     }
+
+    pub fn allergic_reaction(&self, ingredient: &Ingredient) -> bool {
+        let allergy = self
+            .allergies
+            .iter()
+            .find(|a| a.ingredient == *ingredient)
+            .map(|a| a.severity)
+            .unwrap_or(0.0);
+        thread_rng().gen_bool(allergy)
+    }
 }
 
 #[derive(Serialize, Deserialize)]

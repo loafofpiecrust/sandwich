@@ -7,7 +7,7 @@ use crate::{
     display::{PersonalityAction, Render},
     grammar,
     grammar::FullParse,
-    sandwich::Sandwich,
+    sandwich::{Ingredient, Sandwich},
     state::{Idle, OrderingSandwich, State},
 };
 use async_std::future::timeout;
@@ -104,9 +104,37 @@ impl Client {
             color_alt = !color_alt;
 
             // TODO Check for allergic reaction!
+            if let Some(top) = top {
+                if self.lang.allergic_reaction(&top) {
+                    self.have_seizure(top).await?;
+                }
+            }
         }
         // Now eat the sandwich, and save in our history.
         self.lang.eat(sandwich);
+        Ok(())
+    }
+
+    async fn have_seizure(&mut self, allergen: Ingredient) -> anyhow::Result<()> {
+        // Show just the ingredient we're reacting to.
+        self.lang.render(Render {
+            ingredients: Some(vec![allergen]),
+            subtitles: None,
+            background: None,
+        })?;
+        let flicker_gap = Duration::from_millis(100);
+        let total_flickers: u32 = 2500 / 100;
+        for i in 0..total_flickers {
+            // Even numbered time-steps use a different color, creating a
+            // flashing effect.
+            let color_alt = i % 2 == 0;
+            self.lang.render(Render {
+                ingredients: None,
+                subtitles: None,
+                background: Some(if color_alt { "000000ff" } else { "ffffffff" }),
+            })?;
+            task::sleep(flicker_gap).await;
+        }
         Ok(())
     }
 
